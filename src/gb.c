@@ -76,9 +76,50 @@ void gbBreakpoint(Gameboy *gb) {
 }
 
 
-void gbWriteAt(Gameboy *gb, const u16 address, u8 value, bool log) {
+void gbWriteAt(Gameboy *gb, u16 address, u8 value, bool log) {
     if(log)
         gb->last_write = address;
+    
+    // MBC Ram enable
+    if(address >= 0x0000 && address <= 0x1FFF) {
+        if(value >= 0x0A) {
+            SDL_Log("Enabling MBC Ram");
+        } else {
+            SDL_Log("Disabling MBC Ram");
+        }
+        return;
+    }
+    // ROM bank number
+    if(address >= 0x2000 && address <= 0x3FFF) {
+        if(value == 0 || value == 0x20 || value == 0x40 || value == 0x60 ) {
+            value++;
+        }
+        gb->rom_bank = value;
+        return;
+    }
+    // RAM Bank number / Upper bits of rom bank number
+    if(address >= 0x4000 && address <= 0x5FFF) {
+        value &= 0x3;
+        if(gb->ram_bank_mode) {
+            gb->ram_bank = value;
+        } else {
+            gb->rom_bank = (gb->rom_bank & 0b10011111) | value;
+        }
+        return;
+    }
+    // Bank mode
+    if(address >= 0x6000 && address <= 0x7FFF) {
+        gb->ram_bank_mode = value;
+        return;
+    }
+    
+    // RAM
+    if(address >= MEM_CARTRAM_START && address <= MEM_CARTRAM_END) {
+        u16 offset = gb->ram_bank * 0x2000;
+        u16 relative_address = address - MEM_CARTRAM_START;
+        gb->cart_ram[relative_address + offset] = value;
+        return;
+    }
     
     switch(address){
         case (IO_DMA) : {
@@ -88,20 +129,63 @@ void gbWriteAt(Gameboy *gb, const u16 address, u8 value, bool log) {
         case (IO_IF)   : value |= 0xE0; break;
         case (IO_TAC)  : value |= 0xF8; break;
     }
-    gb->mem[address] = value;
     
+    if(address >= MEM_MIRROR0_START && address <= MEM_MIRROR1_END) {
+        address -= MEM_MIRROR0_START;
+    }
+    
+    gb->mem[address] = value;
     return;
 }
 
-u8 gbReadAt(Gameboy *gb, const u16 address, bool debug) {
+u8 gbReadAt(Gameboy *gb, u16 address, bool log) {
     
-    if(!debug)
+    if(log)
         gb->last_read = address;
+    
+    if(address <= MEM_ROM00_END) {
+        return gb->rom[address];
+    }
+    if(address >= MEM_ROMNN_START && address <= MEM_ROMNN_END) {
+        u16 offset = gb->rom_bank * 0x4000;
+        u16 base_address = address - MEM_ROMNN_START;
+        return gb->rom[base_address + offset];
+    }
+    
+    if(address >= MEM_CARTRAM_START && address <= MEM_CARTRAM_END) {
+        u16 offset = gb->ram_bank * 0x2000;
+        u16 relative_address = address - MEM_CARTRAM_START;
+        return gb->cart_ram[relative_address + offset];
+    }
+    
+    if(address >= MEM_MIRROR0_START && address <= MEM_MIRROR1_END) {
+        address -= MEM_MIRROR0_START;
+    }
     
     return gb->mem[address];
 }
 
-u8 *gbGetPointerTo(Gameboy *gb, const u16 address) {
+u8 *gbGetPointerTo(Gameboy *gb, u16 address) {
+    
+    if(address <= MEM_ROM00_END) {
+        return &gb->rom[address];
+    }
+    if(address >= MEM_ROMNN_START && address <= MEM_ROMNN_END) {
+        u16 offset = gb->rom_bank * 0x4000;
+        u16 base_address = address - MEM_ROMNN_START;
+        return &gb->rom[base_address + offset];
+    }
+    
+    if(address >= MEM_CARTRAM_START && address <= MEM_CARTRAM_END) {
+        u16 offset = gb->ram_bank * 0x2000;
+        u16 relative_address = address - MEM_CARTRAM_START;
+        return &gb->cart_ram[relative_address + offset];
+    }
+    
+    if(address >= MEM_MIRROR0_START && address <= MEM_MIRROR1_END) {
+        address -= MEM_MIRROR0_START;
+    }
+    
     return &gb->mem[address];
 }
 
@@ -201,12 +285,22 @@ void gbLoadRom(Gameboy *gb, const char *path) {
     
     fseek(rom, 0, SEEK_END);
     u32 size = ftell(rom);
-    
     rewind(rom);
-    i32 a = MEM_ROM_SIZE;
-    assert(size - 1 <= MEM_ROM_SIZE);
-    fread(gb->mem, 1, MEM_ROM_SIZE, rom);
+    
+    gb->rom = calloc(size, sizeof(u8));
+    
+    fread(gb->rom, 1, size, rom);
     fclose(rom);
+    
+    gb->cartridge_type = gbReadAt(gb, 0x0147, 0);
+    if(gb->cartridge_type != 0x00 && gb->cartridge_type != 0x01) {
+        SDL_Log("Unsupported cartridge type %02X. Something might not work", gb->cartridge_type);
+    }
+    gb->rom_size = gbReadAt(gb, 0x0148, 0);
+    gb->ram_size = gbReadAt(gb, 0x0149, 0);
+    
+    gb->cart_ram = calloc(1, gb->ram_size);
+    
 }
 
 void gbReset(Gameboy *gb) {
@@ -226,6 +320,7 @@ void gbReset(Gameboy *gb) {
     gbWrite(gb, IO_IF, 0xE1); 
     gbWrite(gb, IO_IE, 0x00); 
     gbWrite(gb, IO_TAC, 0x00); 
+    gbWrite(gb, 0x2000, 0x01); // Select rom bank 1
 }
 
 void gbInit(Gameboy *gb) {
@@ -347,36 +442,36 @@ OAMSprite gbGetOAMSprite(Gameboy *gb, u16 tile_id) {
 TileLine gbGetTileLine(Gameboy *gb, u8 tile_offset, bool mode, u8 line) {
     TileLine result = {0};
     if(mode == 1) {
-        result.data_1 = gbRead(gb, 0x8000 + (tile_offset * 16) + (line * 2));
-        result.data_2 = gbRead(gb, 0x8000 + (tile_offset * 16) + (line * 2) + 1);
+        result.data_1 = gbReadAt(gb, 0x8000 + (tile_offset * 16) + (line * 2),0);
+        result.data_2 = gbReadAt(gb, 0x8000 + (tile_offset * 16) + (line * 2) + 1,0);
     } else if(mode == 0) {
         i16 tile_addr = *((i16 *)(&tile_offset));
         tile_addr *= 16;
-        result.data_1 = gbRead(gb, 0x9000 + tile_addr + (line * 2));
-        result.data_2 = gbRead(gb, 0x9000 + tile_addr + (line * 2) + 1);
+        result.data_1 = gbReadAt(gb, 0x9000 + tile_addr + (line * 2),0);
+        result.data_2 = gbReadAt(gb, 0x9000 + tile_addr + (line * 2) + 1,0);
     }
     return result;
 }
 
 void gbLCD(Gameboy *gb) {
     
-    u8 LCDC = gbRead(gb, IO_LCDC);
+    u8 LCDC = gbReadAt(gb, IO_LCDC ,0);
     
     if(!(LCDC >> 7 & 1)) { // LCD Display Enable
         gb->ppu_clock = 1;
         return;
     }
     
-    u8 STAT = gbRead(gb, IO_STAT);
-    u8 SCY  = gbRead(gb, IO_SCY);
-    u8 SCX  = gbRead(gb, IO_SCX);
-    u8 LY   = gbRead(gb, IO_LY);
-    u8 LYC  = gbRead(gb, IO_LYC);
-    u8 BGP  = gbRead(gb, IO_BGP);
-    u8 OBP0 = gbRead(gb, IO_OBP0);
-    u8 OBP1 = gbRead(gb, IO_OBP1);
-    u8 WY   = gbRead(gb, IO_WY);
-    u8 WX   = gbRead(gb, IO_WX);
+    u8 STAT = gbReadAt(gb, IO_STAT ,0);
+    u8 SCY  = gbReadAt(gb, IO_SCY ,0);
+    u8 SCX  = gbReadAt(gb, IO_SCX ,0);
+    u8 LY   = gbReadAt(gb, IO_LY ,0);
+    u8 LYC  = gbReadAt(gb, IO_LYC ,0);
+    u8 BGP  = gbReadAt(gb, IO_BGP ,0);
+    u8 OBP0 = gbReadAt(gb, IO_OBP0 ,0);
+    u8 OBP1 = gbReadAt(gb, IO_OBP1 ,0);
+    u8 WY   = gbReadAt(gb, IO_WY ,0);
+    u8 WX   = gbReadAt(gb, IO_WX ,0);
     
     if(LY < SCREEN_HEIGHT) {
         bool window_tile_map_select = LCDC >> 6 & 1;
@@ -398,7 +493,7 @@ void gbLCD(Gameboy *gb) {
         
         while(x < SCREEN_WIDTH) {
             u8 line = (LY + SCY) % 8;
-            u8 tile_id = gbRead(gb, tile_map_start);
+            u8 tile_id = gbReadAt(gb, tile_map_start,0);
             TileLine tl = gbGetTileLine(gb, tile_id, tile_data_select, line);
             u16 y = LY + SCY;
             if(y >= SCREEN_HEIGHT)
@@ -440,7 +535,7 @@ void gbLCD(Gameboy *gb) {
         LY = 0;
         //memset(gb->lcd_screen, 0, SCREEN_WIDTH * SCREEN_HEIGHT);
     }
-    gbWrite(gb, 0xFF44, LY);
+    gbWriteAt(gb, 0xFF44, LY, 0);
     
     // Update STAT register
     STAT = (STAT & ~(1 << 2)) | ((LY == LYC) << 2 & (1 << 2)); // Coincidence flag
@@ -452,7 +547,7 @@ void gbLCD(Gameboy *gb) {
     }
     STAT = (STAT & 0b11111100) | mode; // Mode flag
     STAT |= 0x80;
-    gbWrite(gb, IO_STAT, STAT);
+    gbWriteAt(gb, IO_STAT, STAT, 0);
     
     // Interrupts
     if(LY == LYC && STAT >> 6 & 1) { // STAT Interrupt
@@ -499,12 +594,12 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
             gbLCD(gb);
         
         // Timer update
-        gbWriteAt(gb, IO_DIV, gbRead(gb, IO_DIV) + 1, 0);
+        gbWriteAt(gb, IO_DIV, gbReadAt(gb, IO_DIV, 0) + 1, 0);
         
-        u8 TAC = gbRead(gb, IO_TAC);
+        u8 TAC = gbReadAt(gb, IO_TAC,0 );
         if(TAC >> 2 & 1) { // Timer enabled
             gb->timer++;
-            u16 TIMA = gbRead(gb, IO_TIMA);
+            u16 TIMA = gbReadAt(gb, IO_TIMA, 0);
             
             u8 speed = TAC & 0b00000011;
             switch(speed) {
@@ -515,35 +610,35 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
             }
             
             if(TIMA >= 0x100) { // overflow
-                TIMA = gbRead(gb, IO_TMA); // Reset it to TMA
+                TIMA = gbReadAt(gb, IO_TMA, 0); // Reset it to TMA
                 gbInterrupt(gb, INT_TIMER);
             }
             
-            gbWrite(gb, IO_TIMA, TIMA);
+            gbWriteAt(gb, IO_TIMA, TIMA, 0);
         }
         
         // DMA
         if(gb->DMA_cycles_left >= 0) {
-            u16 addr_read = gbRead(gb, 0xFF46) << 8;
+            u16 addr_read = gbReadAt(gb, 0xFF46, 0) << 8;
             addr_read |= gb->DMA_cycles_left;
             u16 addr_write = 0xFE00 + gb->DMA_cycles_left;
             
-            gbWrite(gb, addr_write, gbRead(gb, addr_read));
+            gbWriteAt(gb, addr_write, gbReadAt(gb, addr_read, 0), 0);
             gb->DMA_cycles_left--;
         }
         
         // Interrupts
         if(gb->ime) {
-            u8 IF = gbRead(gb, IO_IF);
-            u8 IE = gbRead(gb, IO_IE);
+            u8 IF = gbReadAt(gb, IO_IF, 0);
+            u8 IE = gbReadAt(gb, IO_IE, 0);
             
             for(u8 i = 0; i < 5; i++ ){
                 if(IE & (1 << i) && IF & (1 << i)) {
                     IF = ~(1 << i) & IF;
-                    gbWrite(gb, IO_IF, IF);
+                    gbWriteAt(gb, IO_IF, IF, 0);
                     gb->ime = 0;
-                    gbWrite(gb, --gb->sp, gb->pc >> 8 & 0xFF);
-                    gbWrite(gb, --gb->sp, gb->pc & 0xFF);
+                    gbWriteAt(gb, --gb->sp, gb->pc >> 8 & 0xFF, 0);
+                    gbWriteAt(gb, --gb->sp, gb->pc & 0xFF, 0);
                     gb->pc = 0x40 + (i * 0x8);
                     SDL_Log("Interrupt triggered %04X", gb->pc);
                 }
@@ -551,7 +646,7 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
         }
         
         // Inputs
-        u8 JOY = gbRead(gb, IO_JOY);
+        u8 JOY = gbReadAt(gb, IO_JOY, 0);
         if(JOY & (1 << 5)) { // Button
             JOY = 0b11100000;
             JOY |= gb->keys_buttons & 0x0F;
@@ -599,17 +694,17 @@ void DebugDrawMemLines(Gameboy *gb, u16 addr, u16 nb, u32 *x, u32 *y, SDL_Render
         for(u32 j = 0; j < 16; j++) {
             if(addr + j == current_addr) {
                 SDL_SetRenderDrawColor(renderer, 100, 200, 100, 255);
-                RenderText(renderer, x, *y, "%02X ", gbReadAt(gb, addr + j, 1));
+                RenderText(renderer, x, *y, "%02X ", gbReadAt(gb, addr + j, 0));
                 SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
                 if(current_addr == gb->pc)
-                    instruction_bytes = OPCODE_DESC_TABLE[gbReadAt(gb, gb->pc, 1)].bytes - 1;
+                    instruction_bytes = OPCODE_DESC_TABLE[gbReadAt(gb, gb->pc, 0)].bytes - 1;
             } else if (instruction_bytes > 0){
                 SDL_SetRenderDrawColor(renderer, 200, 100, 100, 255);
-                RenderText(renderer, x, *y, "%02X ", gbReadAt(gb, addr + j, 1));
+                RenderText(renderer, x, *y, "%02X ", gbReadAt(gb, addr + j, 0));
                 instruction_bytes--;
                 SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
             } else {
-                RenderText(renderer, x, *y, "%02X ", gbReadAt(gb, addr + j, 1));
+                RenderText(renderer, x, *y, "%02X ", gbReadAt(gb, addr + j, 0));
             }
         }
         addr += 16;
@@ -618,7 +713,7 @@ void DebugDrawMemLines(Gameboy *gb, u16 addr, u16 nb, u32 *x, u32 *y, SDL_Render
 }
 
 void gbDrawDissassembly(Gameboy *gb, u32 *addr, u32 x, u32 *y, SDL_Renderer *renderer) {
-    Opcode code = OPCODE_DESC_TABLE[gbReadAt(gb, *addr, 1)];
+    Opcode code = OPCODE_DESC_TABLE[gbReadAt(gb, *addr, 0)];
     u32 op_x = x;
     u32 orig_y = *y;
     u32 start_addr = *addr;
@@ -637,13 +732,13 @@ void gbDrawDissassembly(Gameboy *gb, u32 *addr, u32 x, u32 *y, SDL_Renderer *ren
     }
     
     for(u32 i = 0; i < code.bytes; i++){
-        RenderText(renderer, &x, *y, "%02X ", gbReadAt(gb, start_addr + i, 1));
+        RenderText(renderer, &x, *y, "%02X ", gbReadAt(gb, start_addr + i, 0));
     }
     u32 desc_x = op_x + 150;
     RenderText(renderer, &desc_x, *y, "%s ", code.desc);
     u32 operand_x = op_x + 300;
     for(u32 i = 1; i < code.bytes; i++){
-        RenderText(renderer, &operand_x, *y, "%02X", gbReadAt(gb, start_addr + i, 1));
+        RenderText(renderer, &operand_x, *y, "%02X", gbReadAt(gb, start_addr + i, 0));
     }
     *y += TTF_FontHeight(global_font);
     if(io.mouse_down) {
@@ -698,37 +793,38 @@ void gbDrawDebug(Gameboy *gb, SDL_Rect rect, Console *console, SDL_Renderer *ren
         RenderLine(renderer, x, &y, "C %u", (gb->f >> 4) & 1);
         RenderLine(renderer, x, &y, " ");
         RenderLine(renderer, x, &y, "----------------");
-        u8 LCDC = gbRead(gb, 0xFF40);
-        u8 STAT = gbRead(gb, 0xFF41);
+        u8 LCDC = gbReadAt(gb, 0xFF40, 0);
+        u8 STAT = gbReadAt(gb, 0xFF41, 0);
         RenderLine(renderer, x, &y, "LCDC(FF40) %u%u%u%u%u%u%u%u %02X", BINARY_FMT(LCDC), LCDC);
         RenderLine(renderer, x, &y, "STAT(FF41) %u%u%u%u%u%u%u%u %02X", BINARY_FMT(STAT), STAT);
-        RenderLine(renderer, x, &y, "SCY (FF42) %02X",    gbReadAt(gb, IO_SCY, 1));
-        RenderLine(renderer, x, &y, "SCX (FF43) %02X",    gbReadAt(gb, IO_SCX, 1));
-        RenderLine(renderer, x, &y, "LY  (FF44) %02X %u", gbReadAt(gb, IO_LY, 1), gbReadAt(gb, 0XFF44, 1));
-        RenderLine(renderer, x, &y, "DMA (FF46) %02X",    gbReadAt(gb, IO_DMA, 1));
+        RenderLine(renderer, x, &y, "SCY (FF42) %02X",    gbReadAt(gb, IO_SCY, 0));
+        RenderLine(renderer, x, &y, "SCX (FF43) %02X",    gbReadAt(gb, IO_SCX, 0));
+        RenderLine(renderer, x, &y, "LY  (FF44) %02X %u", gbReadAt(gb, IO_LY, 0), gbReadAt(gb, 0XFF44, 0));
+        RenderLine(renderer, x, &y, "DMA (FF46) %02X",    gbReadAt(gb, IO_DMA, 0));
         RenderLine(renderer, x, &y, "DMA Timer  %02X", gb->DMA_cycles_left);
         RenderLine(renderer, x, &y, "----------------");
         RenderLine(renderer, x, &y, "LAST R     %04X", gb->last_read);
         RenderLine(renderer, x, &y, "LAST W     %04X", gb->last_write);
-        RenderLine(renderer, x, &y, "TIMA(FF05)  %02X", gbReadAt(gb, IO_TIMA, 1));
-        RenderLine(renderer, x, &y, "TMA (FF06)  %02X", gbReadAt(gb, IO_TMA, 1));
-        RenderLine(renderer, x, &y, "TAC (FF07)  %02X", gbReadAt(gb, IO_TAC, 1));
+        RenderLine(renderer, x, &y, "TIMA(FF05) %02X", gbReadAt(gb, IO_TIMA, 0));
+        RenderLine(renderer, x, &y, "TMA (FF06) %02X", gbReadAt(gb, IO_TMA, 0));
+        RenderLine(renderer, x, &y, "TAC (FF07) %02X", gbReadAt(gb, IO_TAC, 0));
         RenderLine(renderer, x, &y, "BUT        %u%u%u%u%u%u%u%u", BINARY_FMT(gb->keys_buttons));
         RenderLine(renderer, x, &y, "PAD        %u%u%u%u%u%u%u%u", BINARY_FMT(gb->keys_dpad));
-        
+        RenderLine(renderer, x, &y, "ROM        %02X", gb->rom_bank);
+        RenderLine(renderer, x, &y, "RAM        %02X", gb->ram_bank);
         
     }
     {
         u32 y = rect.h + 10;
         u32 x = 75;
         
-        u8 IF = gbRead(gb, IO_IF);
-        u8 IE = gbRead(gb, IO_IE);
+        u8 IF = gbReadAt(gb, IO_IF, 0);
+        u8 IE = gbReadAt(gb, IO_IE, 0);
         RenderLine(renderer, x, &y, "ime   %d", gb->ime);
         RenderLine(renderer, x, &y, "IF %u%u%u%u%u%u %02X", IF >> 5 & 1,IF >> 4 & 1, IF >> 3 & 1, IF >> 2 & 1, IF >> 1 & 1, IF >> 0 & 1, IF);
         RenderLine(renderer, x, &y, "IE %u%u%u%u%u%u %02X", IE >> 5 & 1, IE >> 4 & 1, IE >> 3 & 1, IE >> 2 & 1, IE >> 1 & 1, IE >> 0 & 1, IE);
-        RenderLine(renderer, x, &y, "(hl)  %04X", gbReadAt(gb, gb->hl, 1));
-        RenderLine(renderer, x, &y, "(sp)  %04X", gbReadAt(gb, gb->sp, 1));
+        RenderLine(renderer, x, &y, "(hl)  %04X", gbReadAt(gb, gb->hl, 0));
+        RenderLine(renderer, x, &y, "(sp)  %04X", gbReadAt(gb, gb->sp, 0));
         
         RenderLine(renderer, x, &y, " ");
         RenderLine(renderer, x, &y, "--------");
@@ -878,13 +974,13 @@ void gbDrawDebug(Gameboy *gb, SDL_Rect rect, Console *console, SDL_Renderer *ren
         RenderLine(renderer, x_section_start, &y_section, " ");
         {
             RenderLine(renderer, x_section_start, &y_section, "MAP 1");
-            u8 LCDC = gbRead(gb, 0xFF40);
+            u8 LCDC = gbReadAt(gb, 0xFF40, 0);
             bool tile_data_select = LCDC >> 4 & 1;
             u16 base_addr = 0x9800;
             for(u32 y = 0; y < 32; y++) {
                 for(u32 x = 0; x < 32; x++) {
                     u16 addr = base_addr + x + y * 32;
-                    u8 tile_id = gbReadAt(gb, addr, 1);
+                    u8 tile_id = gbReadAt(gb, addr, 0);
                     for(u16 line = 0; line < 8; line++) {
                         TileLine tl = gbGetTileLine(gb, tile_id, tile_data_select, line);
                         for(i32 row = 0; row < 8; row++) {
@@ -918,7 +1014,7 @@ void gbDrawDebug(Gameboy *gb, SDL_Rect rect, Console *console, SDL_Renderer *ren
                     SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
                 }
                 RenderText(renderer, &x, y_section, "%04X ", addr - i);
-                RenderText(renderer, &x, y_section, "%02X", gbReadAt(gb, addr - i, 1));
+                RenderText(renderer, &x, y_section, "%02X", gbReadAt(gb, addr - i, 0));
                 y_section += TTF_FontHeight(global_font);
                 x_section = x;
             }
