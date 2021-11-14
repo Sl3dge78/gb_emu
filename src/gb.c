@@ -579,7 +579,9 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
     
     while(gb->cycles_left >= 0) {
         if(gb->cpu_clock <= 0) {
-            gbExecute(gb);
+            if(!gb->halted) 
+                gbExecute(gb);
+            
             for(u32 i = 0; i < gb->breakpoint_count; i ++) {
                 if(gb->pc == gb->breakpoints[i]) {
                     gb->step_through = true;
