@@ -1280,9 +1280,9 @@ void gbPrefixCB(Gameboy *gb) {
         default : 
         if(first >= 0x4 && first <= 0x7) { // BIT
             u8 bit = (first - 0x4) * 2 + above_8;
-            Z = (*src >> bit & 1);
+            Z = (((*src >> bit) & 1) == 0);
             N = 0;
-            H = 0;
+            H = 1;
             C = -1;
         } else if(first >= 0x8 && first <= 0xB) { // RES
             u8 bit = (first - 0x8) * 2 + above_8;

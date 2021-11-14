@@ -84,6 +84,19 @@ const u16 MEM_HRAM_SIZE   = MEM_HRAM_END - MEM_HRAM_START + 1;
 const u16 MEM_END         = 0xFFFF;
 const u32 MEM_SIZE        = 0x10000;
 
+typedef struct Color {
+    u8 r;
+    u8 g;
+    u8 b;
+} Color;
+
+const Color palette[4] = {
+    {0xE0, 0xF8, 0xD0},
+    {0x88, 0xC0, 0x70},
+    {0x34, 0x68, 0x56},
+    {0x08, 0x18, 0x20},
+};
+
 #define LOG_OPCODE SDL_LOG_CATEGORY_CUSTOM
 
 u8 Z_FLAG = 1 << 7;

@@ -83,15 +83,15 @@ void gbWriteAt(Gameboy *gb, const u16 address, const u8 value, bool log) {
     switch(address){
         case (IO_DMA) : {
             gb->DMA_cycles_left = 0x9F; // DMA transfer
-            SDL_Log("DMA TRANSFER!");
         } break;
         case (IO_STAT) : return; // Prevent writing
     }
     gb->mem[address] = value;
     
-    if(address == 0x9860) {
+    /*
+    if(address == 0xC001)
         gbBreakpoint(gb);
-    }
+    */
     
     return;
 }
@@ -265,10 +265,10 @@ void gbInput(Gameboy *gb, SDL_KeyboardEvent *e) {
             gb->step_through = !gb->step_through; 
             gb->cpu_clock = 0.0f; 
         } break;
-        case(SDL_SCANCODE_F7)   :
-        case(SDL_SCANCODE_N)     : gb->cycles_left = gb->cpu_clock == 0 ? 1 : gb->cpu_clock; break;
-        case(SDL_SCANCODE_R)     : gbReset(gb); SDL_Log("Reset", global_logverbose); break;
-        case(SDL_SCANCODE_V)     : { 
+        case(SDL_SCANCODE_F7) :
+        case(SDL_SCANCODE_N)  : gb->cycles_left = gb->cpu_clock == 0 ? 1 : gb->cpu_clock; break;
+        case(SDL_SCANCODE_R)  : gbReset(gb); SDL_Log("Reset", global_logverbose); break;
+        case(SDL_SCANCODE_V)  : { 
             global_logverbose = !global_logverbose; 
             SDL_LogSetPriority(LOG_OPCODE, global_logverbose ? SDL_LOG_PRIORITY_VERBOSE : SDL_LOG_PRIORITY_INFO);
             SDL_Log("Verbose = %d", global_logverbose); 
@@ -306,7 +306,6 @@ OAMSprite gbGetOAMSprite(Gameboy *gb, u16 tile_id) {
         SDL_Log("Attempting to access tile No %u. This is out of the bounds of the OAM", tile_id);
     }
     result.y = gbRead(gb, 0xFE00 + (tile_id * 4));
-    
     result.x     = gbRead(gb, 0xFE00 + (tile_id * 4) + 1);
     result.tile  = gbRead(gb, 0xFE00 + (tile_id * 4) + 2);
     result.flags = gbRead(gb, 0xFE00 + (tile_id * 4) + 3);
@@ -361,7 +360,7 @@ void gbLCD(Gameboy *gb) {
         
         // Offset the start by SCX and SCY
         u16 tile_map_start = tile_map_base_address + SCX;
-        tile_map_start += (LY + SCY) / 8 * 32 ;
+        tile_map_start += (LY + SCY) / 8 * 32;
         
         u8 x_offset = SCX % 8;
         
@@ -377,27 +376,29 @@ void gbLCD(Gameboy *gb) {
             tile_map_start++;
         }
         
-#if 0
         // OAM
         x = 0;
-        u8 tile_count = 0;
-        
+        u8 sprite_count = 0;
         for(u32 i = 0; i < 40; i++) {
-            if(tile_count >= 10) 
+            if(sprite_count >= 10) 
                 break;
             OAMSprite sprite = gbGetOAMSprite(gb, i);
-            if(sprite.y <= LY && sprite.y + 8 > LY) {
+            
+            if(sprite.y < 0x10)
+                continue;
+            
+            sprite.y -= 0x10;
+            if(sprite.y <= LY && sprite.y + 8 >= LY) {
                 // Draw tile
-                u8 line = sprite.y - LY;
-                TileLine tl = gbGetTileLine(gb, sprite.tile, 0, line);
-                u32 x = sprite.x;
-                gbRenderTileLine(gb, tl, &x, LY);
-                tile_count++;
+                u8 line = LY - sprite.y;
+                TileLine tl = gbGetTileLine(gb, sprite.tile, 1, line);
+                u32 sx = sprite.x - 0x08;
+                gbRenderTileLine(gb, tl, &sx, LY, 0);
+                sprite_count++;
             } else {
                 continue;
             }
         }
-#endif
     }
     
     
@@ -511,7 +512,7 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
                     gbWrite(gb, --gb->sp, gb->pc >> 8 & 0xFF);
                     gbWrite(gb, --gb->sp, gb->pc & 0xFF);
                     gb->pc = 0x40 + i * 0x8;
-                    SDL_Log("Interrupt triggered %04X", gb->pc);
+                    SDL_LogVerbose(0, "Interrupt triggered %04X", gb->pc);
                 }
             }
         }
@@ -522,10 +523,10 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
         const u8 *keyboard = SDL_GetKeyboardState(0);
         if(JOY & 1 << 5) { // Button
             JOY = 0b11100000;
-            JOY |= !(keyboard[SDL_SCANCODE_S]) << 3; // B
-            JOY |= !(keyboard[SDL_SCANCODE_A]) << 2; // A
-            JOY |= !(keyboard[SDL_SCANCODE_W]) << 1; // Select
-            JOY |= !(keyboard[SDL_SCANCODE_Q]) << 0; // Start
+            JOY |= !(keyboard[SDL_SCANCODE_A]) << 3; // B
+            JOY |= !(keyboard[SDL_SCANCODE_S]) << 2; // A
+            JOY |= !(keyboard[SDL_SCANCODE_Z]) << 1; // Select
+            JOY |= !(keyboard[SDL_SCANCODE_X]) << 0; // Start
         }
         if(JOY & 1 << 4) { // D-Pad
             JOY = 0b11010000;
@@ -534,7 +535,7 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
             JOY |= !(keyboard[SDL_SCANCODE_LEFT]) << 1;
             JOY |= !(keyboard[SDL_SCANCODE_RIGHT]) << 0;
         }
-        gbWrite(gb, IO_JOY, JOY);
+        gbWriteAt(gb, IO_JOY, JOY, 0);
         
         gb->cpu_clock--;
         gb->ppu_clock--;
@@ -544,14 +545,15 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
 
 void gbDraw(Gameboy *gb, u32 zoom, SDL_Renderer *renderer) {
     SDL_Rect panel = {0, 0, SCREEN_WIDTH * zoom, SCREEN_HEIGHT * zoom };
-    SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
     SDL_RenderDrawRect(renderer, &panel);
     
     for(u32 y = 0; y < SCREEN_HEIGHT; y++) {
         for(u32 x = 0; x < SCREEN_WIDTH; x++) {
             u8 pixel = gb->lcd_screen[y][x];
-            const u32 col = 255 / 4;
-            SDL_SetRenderDrawColor(renderer, col * pixel, col * pixel, col * pixel, 255); 
+            
+            Color color = palette[pixel];
+            
+            SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 255); 
             SDL_RenderDrawPoint(renderer, x, y);
         }
     }
@@ -808,9 +810,8 @@ void gbDrawDebug(Gameboy *gb, SDL_Rect rect, Console *console, SDL_Renderer *ren
                             u8 pixel = (tl.data_2 >> (7-t_x) & 1);
                             pixel <<= 1;
                             pixel |= (tl.data_1 >> (7-t_x) & 1);
-                            
-                            const u32 col = 255 / 4;
-                            SDL_SetRenderDrawColor(renderer, col * pixel, col * pixel, col * pixel, 255); 
+                            Color color = palette[pixel];
+                            SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 255); 
                             SDL_RenderDrawPoint(renderer, x + t_x, y + t_y);
                             
                         }
@@ -833,9 +834,8 @@ void gbDrawDebug(Gameboy *gb, SDL_Rect rect, Console *console, SDL_Renderer *ren
                             u8 pixel = (tl.data_2 >> (7-t_x) & 1);
                             pixel <<= 1;
                             pixel |= (tl.data_1 >> (7-t_x) & 1);
-                            
-                            const u32 col = 255 / 4;
-                            SDL_SetRenderDrawColor(renderer, col * pixel, col * pixel, col * pixel, 255); 
+                            Color color = palette[pixel];
+                            SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 255); 
                             SDL_RenderDrawPoint(renderer, x + t_x, y + t_y);
                             
                         }
@@ -863,9 +863,8 @@ void gbDrawDebug(Gameboy *gb, SDL_Rect rect, Console *console, SDL_Renderer *ren
                             u8 pixel = (tl.data_2 >> (7 - row) & 1);
                             pixel <<= 1;
                             pixel |= (tl.data_1 >> (7 - row) & 1);
-                            
-                            const u32 col = 255 / 4;
-                            SDL_SetRenderDrawColor(renderer, col * pixel, col * pixel, col * pixel, 255); 
+                            Color color = palette[pixel];
+                            SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 255); 
                             SDL_RenderDrawPoint(renderer, x_section + x * 8 + row, y_section + y * 8 + line);
                         }
                     }
