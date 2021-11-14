@@ -734,6 +734,7 @@ void gbExecute(Gameboy *gb) {
             gb->b = gbRead(gb,gb->sp++);
         } break;
         case(0xC2): {
+            u16 from = gb->pc;
             gb->pc++;
             u8 val1 = gbRead(gb, gb->pc++);
             u8 val2 = gbRead(gb, gb->pc++);
@@ -742,16 +743,20 @@ void gbExecute(Gameboy *gb) {
             if(!(gb->f & Z_FLAG)) {
                 gb->pc = pc;
                 gb->cpu_clock += 4;
+                StackPush(&gb->call_stack, from, gb->pc);
             }
         } break;
         case(0xC3): {
             u16 pc = 0;
             pc |= gbRead(gb, gb->pc + 1);
             pc |= gbRead(gb, gb->pc + 2) << 8;
+            u16 from = gb->pc;
             gb->pc = pc;
             gb->cpu_clock += 16;
+            StackPush(&gb->call_stack, from, gb->pc);
         } break;
         case(0xC4): {
+            u16 from = gb->pc;
             gb->pc++;
             u8 val1 = gbRead(gb, gb->pc++);
             u8 val2 = gbRead(gb, gb->pc++);
@@ -762,6 +767,7 @@ void gbExecute(Gameboy *gb) {
                 gbWrite(gb, --gb->sp, gb->pc & 0xFF);
                 gb->pc = pc;
                 gb->cpu_clock += 4;
+                StackPush(&gb->call_stack, from, gb->pc);
             }
         } break;
         case(0xC5): { 
@@ -805,6 +811,7 @@ void gbExecute(Gameboy *gb) {
             StackPush(&gb->call_stack, from, gb->pc);
         } break;
         case(0xCA): {
+            u16 from = gb->pc;
             gb->pc++;
             u8 val1 = gbRead(gb, gb->pc++);
             u8 val2 = gbRead(gb, gb->pc++);
@@ -814,6 +821,7 @@ void gbExecute(Gameboy *gb) {
             if(gb->f & Z_FLAG) {
                 gb->pc = pc;
                 gb->cpu_clock += 4;
+                StackPush(&gb->call_stack, from, gb->pc);
             }
         } break;
         case(0xCB): {
@@ -821,6 +829,7 @@ void gbExecute(Gameboy *gb) {
             gbPrefixCB(gb);
         } break;
         case(0xCC): {
+            u16 from = gb->pc;
             gb->pc++;
             u8 val1 = gbRead(gb, gb->pc++);
             u8 val2 = gbRead(gb, gb->pc++);
@@ -831,6 +840,7 @@ void gbExecute(Gameboy *gb) {
                 u16 pc = val1 | val2 << 8;
                 gb->pc = pc;
                 gb->cpu_clock += 4;
+                StackPush(&gb->call_stack, from, gb->pc);
             }
         } break;
         case(0xCD): {
@@ -860,6 +870,7 @@ void gbExecute(Gameboy *gb) {
             StackPush(&gb->call_stack, from, gb->pc);
         } break;
         case(0xD0): {
+            u16 from = gb->pc;
             gb->pc++;
             gb->cpu_clock += 8;
             if(!(gb->f & C_FLAG)) {
@@ -867,6 +878,7 @@ void gbExecute(Gameboy *gb) {
                 pc |= gbRead(gb,gb->sp++) << 8;
                 gb->pc = pc;
                 gb->cpu_clock += 12;
+                StackPush(&gb->call_stack, from, gb->pc);
             }
         } break;
         case(0xD1): {
@@ -876,6 +888,7 @@ void gbExecute(Gameboy *gb) {
             gb->d = gbRead(gb,gb->sp++);
         } break;
         case(0xD2): {
+            u16 from = gb->pc;
             gb->pc++;
             u8 val1 = gbRead(gb, gb->pc++);
             u8 val2 = gbRead(gb, gb->pc++);
@@ -884,9 +897,11 @@ void gbExecute(Gameboy *gb) {
             if(!(gb->f & C_FLAG)) {
                 gb->pc = pc;
                 gb->cpu_clock += 4;
+                StackPush(&gb->call_stack, from, gb->pc);
             }
         } break;
         case(0xD4): {
+            u16 from = gb->pc;
             gb->pc++;
             u8 val1 = gbRead(gb, gb->pc++);
             u8 val2 = gbRead(gb, gb->pc++);
@@ -897,6 +912,7 @@ void gbExecute(Gameboy *gb) {
                 u16 pc = val1 | val2 << 8;
                 gb->pc = pc;
                 gb->cpu_clock += 4;
+                StackPush(&gb->call_stack, from, gb->pc);
             }
         } break;
         case(0xD5): { 
@@ -943,6 +959,7 @@ void gbExecute(Gameboy *gb) {
             gb->ime = 1;
         } break;
         case(0xDA): {
+            u16 from = gb->pc;
             gb->pc++;
             u8 val1 = gbRead(gb, gb->pc++);
             u8 val2 = gbRead(gb, gb->pc++);
@@ -951,9 +968,11 @@ void gbExecute(Gameboy *gb) {
             if(gb->f & C_FLAG) {
                 gb->pc = pc;
                 gb->cpu_clock += 4;
+                StackPush(&gb->call_stack, from, gb->pc);
             }
         } break;
         case(0xDC): {
+            u16 from = gb->pc;
             gb->pc++;
             u8 val1 = gbRead(gb, gb->pc++);
             u8 val2 = gbRead(gb, gb->pc++);
@@ -964,6 +983,7 @@ void gbExecute(Gameboy *gb) {
                 u16 pc = val1 | val2 << 8;
                 gb->pc = pc;
                 gb->cpu_clock += 4;
+                StackPush(&gb->call_stack, from, gb->pc);
             }
         } break;
         case(0xDE): {
@@ -1034,8 +1054,10 @@ void gbExecute(Gameboy *gb) {
             
         } break;
         case(0xE9): {
+            u16 from = gb->pc;
             gb->pc = gb->hl;
             gb->cpu_clock += 4;
+            StackPush(&gb->call_stack, from, gb->pc);
         } break;
         case(0xEA): { 
             gb->pc++;
@@ -1057,7 +1079,6 @@ void gbExecute(Gameboy *gb) {
             gbWrite(gb, --gb->sp, gb->pc & 0xFF);
             gb->pc = 0x0028;
             gb->cpu_clock += 16;
-            
             StackPush(&gb->call_stack, from, gb->pc);
         } break;
         case(0xF0): { 
@@ -1107,18 +1128,13 @@ void gbExecute(Gameboy *gb) {
         case(0xF8): {
             gb->pc++;
             gb->cpu_clock += 16;
-            
-            u16 lower = gb->sp & 0xFF;
-            u16 higher = gb->sp & 0xFF00;
+            u16 lower = gb->sp & 0x00FF;
+            u16 higher = (gb->sp & 0xFF00) >> 8;
             i8 add = gbRead(gb, gb->pc++);
-            
             lower += add & 0xFF;
             higher += lower & 0xFF00 + add & 0xFF00; 
-            
             gb->hl = lower | higher << 8;
-            
             gbSetFlags(gb, 0, 0, (lower & 0xFF00) != 0, (higher & 0xFF00) != 0);
-            
         } break;
         case(0xF9): {
             gb->pc++;
@@ -1269,7 +1285,7 @@ void gbPrefixCB(Gameboy *gb) {
             if(!above_8) { // swap
                 u8 high = *src & 0xF0;
                 u8 low = *src & 0x0F;
-                *src = high << 4 | low >> 4;
+                *src = (high >> 4) | (low << 4);
             } else { // SRL
                 u8 bit = (*src & 1);
                 *src >>= 1; 

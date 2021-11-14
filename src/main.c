@@ -25,11 +25,13 @@ typedef u8 bool;
 #define internal static
 #define global static
 
-global bool BREAKPOINT = false;
-global bool global_logverbose = true;
-
 #define assert(expression) __assert(expression, gb)
 
+
+#define BINARY_FMT(var) var >> 7 & 1, var >> 6 & 1, var >> 5 & 1, var >> 4 & 1, var >> 3 & 1, var >> 2 & 1, var >> 1 & 1, var >> 0 & 1
+
+global bool BREAKPOINT = false;
+global bool global_logverbose = true;
 global TTF_Font *global_font;
 
 typedef struct IO {
@@ -126,7 +128,8 @@ i32 main(i32 argc, char *argv[]) {
         while (SDL_PollEvent(&event)) {  
             switch(event.type) {
                 case SDL_QUIT : gb.running = false; break;
-                case SDL_KEYDOWN : gbInput(&gb, &event.key); break;
+                case SDL_KEYDOWN : gbInput(&gb, &event.key, 0); break;
+                case SDL_KEYUP   : gbInput(&gb, &event.key, 1); break;
                 case SDL_MOUSEBUTTONDOWN : { 
                     if(event.button.button == SDL_BUTTON_LEFT) {
                         io.mouse_down = true;

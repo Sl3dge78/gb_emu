@@ -76,7 +76,7 @@ void gbBreakpoint(Gameboy *gb) {
 }
 
 
-void gbWriteAt(Gameboy *gb, const u16 address, const u8 value, bool log) {
+void gbWriteAt(Gameboy *gb, const u16 address, u8 value, bool log) {
     if(log)
         gb->last_write = address;
     
@@ -85,13 +85,10 @@ void gbWriteAt(Gameboy *gb, const u16 address, const u8 value, bool log) {
             gb->DMA_cycles_left = 0x9F; // DMA transfer
         } break;
         case (IO_STAT) : return; // Prevent writing
+        case (IO_IF)   : value |= 0xE0; break;
+        case (IO_TAC)  : value |= 0xF8; break;
     }
     gb->mem[address] = value;
-    
-    /*
-    if(address == 0xC001)
-        gbBreakpoint(gb);
-    */
     
     return;
 }
@@ -186,10 +183,12 @@ u8 *gbGetRegisterFromID(Gameboy *gb, u8 id) {
 
 void gbInterrupt(Gameboy *gb, u8 id) {
     assert(id <= INT_JOYPAD);
+    gb->halted = false;
     u8 IF = gbRead(gb, IO_IF);
     IF |= 1 << id;
     IF |= 0xE0;
     gbWrite(gb, IO_IF, IF);
+    SDL_LogVerbose(0, "Triggering interrupt %d", id);
 }
 
 // ---------
@@ -222,10 +221,11 @@ void gbReset(Gameboy *gb) {
     gb->h     = 0;
     gb->l     = 0;
     gb->ime   = 0;
-    gbWrite(gb, IO_LCDC, 0x91); // LCDC 
-    gbWrite(gb, IO_STAT, 0x85); // STAT
-    gbWrite(gb, IO_IF, 0xE1); // IF
-    gbWrite(gb, IO_IE, 0x00); // IE
+    gbWrite(gb, IO_LCDC, 0x91);
+    gbWrite(gb, IO_STAT, 0x85);
+    gbWrite(gb, IO_IF, 0xE1); 
+    gbWrite(gb, IO_IE, 0x00); 
+    gbWrite(gb, IO_TAC, 0x00); 
 }
 
 void gbInit(Gameboy *gb) {
@@ -237,6 +237,8 @@ void gbInit(Gameboy *gb) {
     gb->running = true;
     gb->step_through = 1;
     gb->mem = calloc(1, MEM_SIZE);
+    gb->keys_dpad = 0xFF;
+    gb->keys_buttons = 0xFF;
     
     gb->call_stack.capacity = 8;
     gb->call_stack.from = calloc(sizeof(u32), gb->call_stack.capacity);
@@ -259,32 +261,62 @@ void gbInit(Gameboy *gb) {
     gbReset(gb);
 }
 
-void gbInput(Gameboy *gb, SDL_KeyboardEvent *e) {
-    switch(e->keysym.scancode) {
-        case(SDL_SCANCODE_SPACE) : case(SDL_SCANCODE_F9) : {
-            gb->step_through = !gb->step_through; 
-            gb->cpu_clock = 0.0f; 
-        } break;
-        case(SDL_SCANCODE_F7) :
-        case(SDL_SCANCODE_N)  : gb->cycles_left = gb->cpu_clock == 0 ? 1 : gb->cpu_clock; break;
-        case(SDL_SCANCODE_R)  : gbReset(gb); SDL_Log("Reset", global_logverbose); break;
-        case(SDL_SCANCODE_V)  : { 
-            global_logverbose = !global_logverbose; 
-            SDL_LogSetPriority(LOG_OPCODE, global_logverbose ? SDL_LOG_PRIORITY_VERBOSE : SDL_LOG_PRIORITY_INFO);
-            SDL_Log("Verbose = %d", global_logverbose); 
-        } break;
-        case(SDL_SCANCODE_1)     : { 
-            SDL_Log("Triggering V-Blank Interrupt");
-            gbInterrupt(gb, INT_VBLANK);
-        } break;
-        case(SDL_SCANCODE_KP_PLUS) : { 
-            gb->clock_mul *= 2.0f;
-        } break;
-        case(SDL_SCANCODE_KP_MINUS) : { 
-            gb->clock_mul /= 2.0f;
-        } break;
-        default : return;
+void gbInput(Gameboy *gb, SDL_KeyboardEvent *e, bool is_up) {
+    if(!is_up) {
+        switch(e->keysym.scancode) {
+            case(SDL_SCANCODE_SPACE) : case(SDL_SCANCODE_F9) : {
+                gb->step_through = !gb->step_through; 
+                gb->cpu_clock = 0.0f; 
+            } break;
+            case(SDL_SCANCODE_F7) :
+            case(SDL_SCANCODE_N)  : gb->cycles_left = gb->cpu_clock == 0 ? 1 : gb->cpu_clock; break;
+            case(SDL_SCANCODE_R)  : gbReset(gb); SDL_Log("Reset", global_logverbose); break;
+            case(SDL_SCANCODE_V)  : { 
+                global_logverbose = !global_logverbose; 
+                SDL_LogSetPriority(LOG_OPCODE, global_logverbose ? SDL_LOG_PRIORITY_VERBOSE : SDL_LOG_PRIORITY_INFO);
+                SDL_Log("Verbose = %d", global_logverbose); 
+            } break;
+            case(SDL_SCANCODE_1)     : { 
+                SDL_Log("Triggering V-Blank Interrupt");
+                gbInterrupt(gb, INT_VBLANK);
+            } break;
+            case(SDL_SCANCODE_KP_PLUS) : { 
+                gb->clock_mul *= 2.0f;
+            } break;
+            case(SDL_SCANCODE_KP_MINUS) : { 
+                gb->clock_mul /= 2.0f;
+            } break;
+            
+            default: break; 
+        }
     }
+    
+    switch(e->keysym.scancode) {
+        case(SDL_SCANCODE_DOWN) : gb->keys_dpad = (gb->keys_dpad & (0b11110111)) | (is_up << 3);  break;
+        case(SDL_SCANCODE_UP)   : gb->keys_dpad = (gb->keys_dpad & (0b11111011)) | (is_up << 2);  break;
+        case(SDL_SCANCODE_LEFT) : gb->keys_dpad = (gb->keys_dpad & (0b11111101)) | (is_up << 1);  break;
+        case(SDL_SCANCODE_RIGHT): gb->keys_dpad = (gb->keys_dpad & (0b11111110)) | (is_up << 0);  break;
+        case(SDL_SCANCODE_X) : gb->keys_buttons = (gb->keys_buttons & (0b11110111)) | (is_up << 3);  break;
+        case(SDL_SCANCODE_Z) : gb->keys_buttons = (gb->keys_buttons & (0b11111011)) | (is_up << 2);  break;
+        case(SDL_SCANCODE_A) : gb->keys_buttons = (gb->keys_buttons & (0b11111101)) | (is_up << 1);  break;
+        case(SDL_SCANCODE_S) : gb->keys_buttons = (gb->keys_buttons & (0b11111110)) | (is_up << 0);  break;
+        default : break;
+    }
+    
+    if(!is_up) {
+        switch(e->keysym.scancode) {
+            case(SDL_SCANCODE_DOWN) : 
+            case(SDL_SCANCODE_UP)   : 
+            case(SDL_SCANCODE_LEFT) : 
+            case(SDL_SCANCODE_RIGHT): 
+            case(SDL_SCANCODE_X) : 
+            case(SDL_SCANCODE_Z) : 
+            case(SDL_SCANCODE_A) : 
+            case(SDL_SCANCODE_S) : gbInterrupt(gb, INT_JOYPAD);  break;
+            default : break;
+        }
+    }
+    
 }
 
 void gbRenderTileLine(Gameboy *gb, TileLine line, u32 *x, u8 y, u8 x_offset) {
@@ -448,6 +480,8 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
         gb->cycles_left = delta_time * gb->clock_speed * gb->clock_mul;
     }
     
+    const u8 *keyboard = SDL_GetKeyboardState(0);
+    
     while(gb->cycles_left >= 0) {
         if(gb->cpu_clock <= 0) {
             gbExecute(gb);
@@ -470,23 +504,22 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
         u8 TAC = gbRead(gb, IO_TAC);
         if(TAC >> 2 & 1) { // Timer enabled
             gb->timer++;
-            u8 TIMA = gbRead(gb, IO_TIMA);
+            u16 TIMA = gbRead(gb, IO_TIMA);
             
-            u8 speed = TAC & 0x3;
+            u8 speed = TAC & 0b00000011;
             switch(speed) {
-                case 0: if(gb->timer >= 1024) TIMA++; gb->timer = 0; break;
-                case 1: if(gb->timer >= 16)   TIMA++; gb->timer = 0; break;
-                case 2: if(gb->timer >= 64)   TIMA++; gb->timer = 0; break;
-                case 3: if(gb->timer >= 256)  TIMA++; gb->timer = 0; break;
+                case 0: if(gb->timer >= 1024){ TIMA++; gb->timer = 0;} break;
+                case 1: if(gb->timer >= 16)  { TIMA++; gb->timer = 0;} break;
+                case 2: if(gb->timer >= 64)  { TIMA++; gb->timer = 0;} break;
+                case 3: if(gb->timer >= 256) { TIMA++; gb->timer = 0;} break;
             }
             
-            if(TIMA == 0x00) { // overflow
+            if(TIMA >= 0x100) { // overflow
                 TIMA = gbRead(gb, IO_TMA); // Reset it to TMA
                 gbInterrupt(gb, INT_TIMER);
             }
             
             gbWrite(gb, IO_TIMA, TIMA);
-            
         }
         
         // DMA
@@ -511,29 +544,21 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
                     gb->ime = 0;
                     gbWrite(gb, --gb->sp, gb->pc >> 8 & 0xFF);
                     gbWrite(gb, --gb->sp, gb->pc & 0xFF);
-                    gb->pc = 0x40 + i * 0x8;
-                    SDL_LogVerbose(0, "Interrupt triggered %04X", gb->pc);
+                    gb->pc = 0x40 + (i * 0x8);
+                    SDL_Log("Interrupt triggered %04X", gb->pc);
                 }
             }
         }
         
         // Inputs
         u8 JOY = gbRead(gb, IO_JOY);
-        
-        const u8 *keyboard = SDL_GetKeyboardState(0);
-        if(JOY & 1 << 5) { // Button
+        if(JOY & (1 << 5)) { // Button
             JOY = 0b11100000;
-            JOY |= !(keyboard[SDL_SCANCODE_A]) << 3; // B
-            JOY |= !(keyboard[SDL_SCANCODE_S]) << 2; // A
-            JOY |= !(keyboard[SDL_SCANCODE_Z]) << 1; // Select
-            JOY |= !(keyboard[SDL_SCANCODE_X]) << 0; // Start
+            JOY |= gb->keys_buttons & 0x0F;
         }
-        if(JOY & 1 << 4) { // D-Pad
+        if(JOY & (1 << 4)) { // D-Pad
             JOY = 0b11010000;
-            JOY |= !(keyboard[SDL_SCANCODE_DOWN]) << 3;
-            JOY |= !(keyboard[SDL_SCANCODE_UP]) << 2;
-            JOY |= !(keyboard[SDL_SCANCODE_LEFT]) << 1;
-            JOY |= !(keyboard[SDL_SCANCODE_RIGHT]) << 0;
+            JOY |= gb->keys_dpad & 0x0F;
         }
         gbWriteAt(gb, IO_JOY, JOY, 0);
         
@@ -675,18 +700,21 @@ void gbDrawDebug(Gameboy *gb, SDL_Rect rect, Console *console, SDL_Renderer *ren
         RenderLine(renderer, x, &y, "----------------");
         u8 LCDC = gbRead(gb, 0xFF40);
         u8 STAT = gbRead(gb, 0xFF41);
-        RenderLine(renderer, x, &y, "LCDC(FF40) %u%u%u%u%u%u%u%u %02X", LCDC >> 7 & 1, LCDC >> 6 & 1, LCDC >> 5 & 1, LCDC >> 4 & 1, LCDC >> 3 & 1, LCDC >> 2 & 1, LCDC >> 1 & 1, LCDC >> 0 & 1, LCDC);
-        RenderLine(renderer, x, &y, "STAT(FF41) %u%u%u%u%u%u%u%u %02X", STAT >> 7 & 1, STAT >> 6 & 1, STAT >> 5 & 1, STAT >> 4 & 1, STAT >> 3 & 1, STAT >> 2 & 1, STAT >> 1 & 1, STAT >> 0 & 1, STAT);
-        RenderLine(renderer, x, &y, "SC Y(FF42) %02X", gbReadAt(gb, 0XFF42, 1));
-        RenderLine(renderer, x, &y, "SCX (FF43) %02X", gbReadAt(gb, 0XFF43, 1));
-        RenderLine(renderer, x, &y, "LY  (FF44) %02X %u", gbReadAt(gb, 0XFF44, 1), gbReadAt(gb, 0XFF44, 1));
-        RenderLine(renderer, x, &y, "DMA (FF46) %02X", gbReadAt(gb, 0xFF46, 1));
+        RenderLine(renderer, x, &y, "LCDC(FF40) %u%u%u%u%u%u%u%u %02X", BINARY_FMT(LCDC), LCDC);
+        RenderLine(renderer, x, &y, "STAT(FF41) %u%u%u%u%u%u%u%u %02X", BINARY_FMT(STAT), STAT);
+        RenderLine(renderer, x, &y, "SCY (FF42) %02X",    gbReadAt(gb, IO_SCY, 1));
+        RenderLine(renderer, x, &y, "SCX (FF43) %02X",    gbReadAt(gb, IO_SCX, 1));
+        RenderLine(renderer, x, &y, "LY  (FF44) %02X %u", gbReadAt(gb, IO_LY, 1), gbReadAt(gb, 0XFF44, 1));
+        RenderLine(renderer, x, &y, "DMA (FF46) %02X",    gbReadAt(gb, IO_DMA, 1));
         RenderLine(renderer, x, &y, "DMA Timer  %02X", gb->DMA_cycles_left);
         RenderLine(renderer, x, &y, "----------------");
         RenderLine(renderer, x, &y, "LAST R     %04X", gb->last_read);
         RenderLine(renderer, x, &y, "LAST W     %04X", gb->last_write);
-        RenderLine(renderer, x, &y, "TAC        %u%u%u", gbReadAt(gb, 0xFF06, 1));
-        RenderLine(renderer, x, &y, "TIMA       %04X", gbReadAt(gb, 0xFF05, 1));
+        RenderLine(renderer, x, &y, "TIMA(FF05)  %02X", gbReadAt(gb, IO_TIMA, 1));
+        RenderLine(renderer, x, &y, "TMA (FF06)  %02X", gbReadAt(gb, IO_TMA, 1));
+        RenderLine(renderer, x, &y, "TAC (FF07)  %02X", gbReadAt(gb, IO_TAC, 1));
+        RenderLine(renderer, x, &y, "BUT        %u%u%u%u%u%u%u%u", BINARY_FMT(gb->keys_buttons));
+        RenderLine(renderer, x, &y, "PAD        %u%u%u%u%u%u%u%u", BINARY_FMT(gb->keys_dpad));
         
         
     }

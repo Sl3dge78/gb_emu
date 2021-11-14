@@ -152,6 +152,9 @@ typedef struct Gameboy {
     
     u16 timer;
     
+    u8 keys_dpad;
+    u8 keys_buttons;
+    
     // Our stuff
     i32 cpu_clock;
     i32 ppu_clock;
