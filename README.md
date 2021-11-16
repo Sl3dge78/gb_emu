@@ -13,7 +13,7 @@ Run fairly smoothly on my machine. No optimization done at all.
  - [X] 08-misc instrs
  - [ ] 09-op r,r
  - [X] 10-bit ops
- - [ ] 11-op a,(hl)
+ - [X] 11-op a,(hl)
 
 ### Features
 - [ ] Audio

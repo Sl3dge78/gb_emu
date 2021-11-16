@@ -628,20 +628,18 @@ void gbExecute(Gameboy *gb) {
         case (0x34): {
             gb->cpu_clock += 12;
             gb->pc++;
-            
-            u8 val = gbRead(gb, gb->hl);
-            val++;
-            gbWrite(gb, gb->hl, val);
-            
-            gbSetFlags(gb, val == 0, 0, val == 0, -1);
+            u8 value = gbRead(gb, gb->hl);
+            u8 result = value + 1;
+            gbSetFlags(gb, result == 0, 0, (value & 0xF) == 0xF, -1);
+            gbWrite(gb, gb->hl, result);
         } break;
         case (0x35): {
-            gb->cpu_clock += 4;
+            gb->cpu_clock += 12;
             gb->pc++;
             u8 value = gbRead(gb, gb->hl);
-            value--;
-            gbWrite(gb, gb->hl, value);
-            gbSetFlags(gb, value == 0, 1, value == 0xFF, -1);
+            u8 result = value - 1;
+            gbSetFlags(gb, result == 0, 1, (value & 0xF) == 0, -1);
+            gbWrite(gb, gb->hl, result);
         } break;
         case (0x36): { 
             gb->cpu_clock += 4;
@@ -1246,7 +1244,8 @@ void gbPrefixCB(Gameboy *gb) {
                 u8 bit = (*src & 0x80);
                 *src <<= 1; 
                 C = bit >> 7;
-                *src |= (gb->f & C_FLAG) == 1;
+                *src += (gb->f & C_FLAG) != 0;
+                Z = *src == 0;
             } else { // RR
                 u8 bit = (*src & 0x01);
                 *src >>= 1;
@@ -1257,15 +1256,15 @@ void gbPrefixCB(Gameboy *gb) {
         } break;
         case(2) :{ // SLA 
             if(!above_8) {
-                u8 bit = (*src & 0x80);
+                C = (*src & 0b10000000) != 0;
                 *src <<= 1; 
-                C = bit >> 7;
+                Z = *src == 0;
             } else { // SRA
                 u8 bit = (*src & 0x80);
                 C = *src & 0x01;
                 *src >>= 1;
-                *src |= bit << 7;
-                
+                *src |= bit;
+                Z = *src == 0;
             }
             Z = *src == 0;
         } break;
