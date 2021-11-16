@@ -331,11 +331,9 @@ void gbExecute(Gameboy *gb) {
         case (0x09): {
             gb->cpu_clock += 8;
             gb->pc++;
-            u16 low_sum = gb->l + gb->c;
-            gb->l = low_sum & 0xFF;
-            u16 high_sum = gb->h + gb->b + (low_sum >> 8 & 0xFF);
-            gb->h = high_sum & 0xFF;
-            gbSetFlags(gb, -1, 0, low_sum > 0xFF, high_sum > 0xFF);
+            u32 val = gb->hl + gb->bc;
+            gbSetFlags(gb, -1, 0, ((gb->hl & 0xFFF) + (gb->bc & 0xFFF)  > 0xFFF), val > 0xFFFF);
+            gb->hl = val & 0xFFFF;
         } break;
         case (0x0A): { 
             gb->cpu_clock += 8;
@@ -433,11 +431,9 @@ void gbExecute(Gameboy *gb) {
         case (0x19): {
             gb->cpu_clock += 8;
             gb->pc++;
-            u16 low_sum = gb->l + gb->e;
-            gb->l = low_sum & 0xFF;
-            u16 high_sum = gb->h + gb->d + (low_sum >> 8 & 0xFF);
-            gb->h = high_sum & 0xFF;
-            gbSetFlags(gb, -1, 0, low_sum > 0xFF, high_sum > 0xFF);
+            u32 val = gb->hl + gb->de;
+            gbSetFlags(gb, -1, 0, ((gb->hl & 0xFFF) + (gb->de & 0xFFF)  > 0xFFF), val > 0xFFFF);
+            gb->hl = val & 0xFFFF;
         } break;
         case (0x1A): { 
             gb->cpu_clock += 8;
@@ -560,11 +556,9 @@ void gbExecute(Gameboy *gb) {
         case (0x29): {
             gb->cpu_clock += 8;
             gb->pc++;
-            u16 low_sum = gb->l + gb->l;
-            gb->l = low_sum & 0xFF;
-            u16 high_sum = gb->h + gb->h + (low_sum >> 8 & 0xFF);
-            gb->h = high_sum & 0xFF;
-            gbSetFlags(gb, -1, 0, low_sum > 0xFF, high_sum > 0xFF);
+            u32 val = gb->hl + gb->hl;
+            gbSetFlags(gb, -1, 0, ((gb->hl & 0xFFF) + (gb->hl & 0xFFF)  > 0xFFF), val > 0xFFFF);
+            gb->hl = val & 0xFFFF;
         } break;
         case (0x2A): { 
             gb->cpu_clock += 8;

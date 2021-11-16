@@ -7,7 +7,7 @@ Run fairly smoothly on my machine. No optimization done at all.
  - [X] 02-interrupts
  - [X] 03-op sp,hl
  - [X] 04-op r,imm
- - [ ] 05-op rp
+ - [X] 05-op rp
  - [X] 06-ld r,r
  - [X] 07-jr,jp,call,ret,rst
  - [X] 08-misc instrs
