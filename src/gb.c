@@ -204,26 +204,27 @@ void gbSetFlags(Gameboy *gb, i32 Z, i32 N, i32 H, i32 C) {
 
 void gbADD(Gameboy *gb, u8 operand, u8 carry) {
     u16 half_a = gb->a & 0xF;
-    i16 result = gb->a + operand + (carry && ((gb->f & C_FLAG) != 0));
     half_a += operand & 0xF;
+    u16 result = gb->a + operand;
+    if((gb->f & C_FLAG) != 0 && carry) {
+        result += carry;
+        half_a += carry;
+    }
     
     gbSetFlags(gb, (result & 0xFF) == 0, 0, half_a > 0xF, result > 0xFF);
-    
     gb->a = result & 0xFF;
 }
 
 void gbSUB(Gameboy *gb, u8 operand, u8 carry) {
-    i16 half_a = gb->a & 0xF;
-    
-    i16 result = gb->a - operand + (carry && ((gb->f & C_FLAG) != 0));
+    u16 half_a = gb->a & 0xF;
     half_a -= operand & 0xF;
-    
-    gbSetFlags(gb, result == 0, 1, half_a < 0, result < 0);
-    
-    if(result < 0)
-        gb->a = 256 + result;
-    else
-        gb->a = result;
+    u16 result = gb->a - operand;
+    if((gb->f & C_FLAG) != 0 && carry) {
+        result -= carry;
+        half_a -= carry;
+    }
+    gbSetFlags(gb, (result & 0xFF) == 0, 1, half_a > 0xF, result > 0xFF);
+    gb->a = result & 0xFF;
 }
 
 void gbAND(Gameboy *gb, u8 operand) {

@@ -6,7 +6,7 @@ Run fairly smoothly on my machine. No optimization done at all.
  - [X] 01-special
  - [X] 02-interrupts
  - [X] 03-op sp,hl
- - [ ] 04-op r,imm
+ - [X] 04-op r,imm
  - [ ] 05-op rp
  - [X] 06-ld r,r
  - [X] 07-jr,jp,call,ret,rst
