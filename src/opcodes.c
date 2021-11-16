@@ -299,13 +299,13 @@ void gbExecute(Gameboy *gb) {
             gb->cpu_clock += 4;
             gb->pc++;
             gb->b++;
-            gbSetFlags(gb, gb->b == 0, 0, gb->b == 0, -1);
+            gbSetFlags(gb, gb->b == 0, 0, (gb->b & 0xF) == 0, -1);
         } break;
         case (0x05): {
             gb->cpu_clock += 4;
             gb->pc++;
             gb->b--;
-            gbSetFlags(gb, gb->b == 0, 1, gb->b == 0xFF, -1);
+            gbSetFlags(gb, gb->b == 0, 1, (gb->b & 0xF) == 0xF, -1);
         } break;
         case (0x06): {
             gb->cpu_clock += 4;
@@ -351,13 +351,13 @@ void gbExecute(Gameboy *gb) {
             gb->cpu_clock += 4;
             gb->pc++;
             gb->c++;
-            gbSetFlags(gb, gb->c == 0, 0, gb->c == 0x00, -1);
+            gbSetFlags(gb, gb->c == 0, 0, (gb->c & 0xF) == 0x00, -1);
         } break;
         case (0x0D): {
             gb->cpu_clock += 4;
             gb->pc++;
             gb->c--;
-            gbSetFlags(gb, gb->c == 0, 1, gb->c == 0xFF, -1);
+            gbSetFlags(gb, gb->c == 0, 1, (gb->c & 0xF) == 0xF, -1);
         } break;
         case (0x0E): { 
             gb->cpu_clock += 4;
@@ -401,13 +401,13 @@ void gbExecute(Gameboy *gb) {
             gb->cpu_clock += 4;
             gb->pc++;
             gb->d++;
-            gbSetFlags(gb, gb->d == 0, 0, gb->d == 0, -1);
+            gbSetFlags(gb, gb->d == 0, 0, (gb->d & 0xF) == 0, -1);
         } break;
         case (0x15): {
             gb->cpu_clock += 4;
             gb->pc++;
             gb->d--;
-            gbSetFlags(gb, gb->d == 0, 1, gb->d == 0xFF, -1);
+            gbSetFlags(gb, gb->d == 0, 1, (gb->d & 0xF) == 0xF, -1);
         } break;
         case (0x16): {
             gb->cpu_clock += 4;
@@ -417,10 +417,10 @@ void gbExecute(Gameboy *gb) {
         case (0x17): {
             gb->cpu_clock += 4;
             gb->pc++;
-            u8 bit = (gb->a & 0x80);
+            u8 bit = (gb->a & 0b10000000) != 0;
             gb->a <<= 1; 
-            gb->a |= bit >> 7;
-            gbSetFlags(gb, 0,0,0, bit >> 7);
+            gb->a |= (gb->f & C_FLAG) != 0;
+            gbSetFlags(gb, 0, 0, 0, bit);
         } break;
         case (0x18): {
             gb->pc++;
@@ -451,13 +451,13 @@ void gbExecute(Gameboy *gb) {
             gb->cpu_clock += 4;
             gb->pc++;
             gb->e++;
-            gbSetFlags(gb, gb->e == 0, 0, gb->e == 0x00, -1);
+            gbSetFlags(gb, gb->e == 0, 0, (gb->e & 0xF) == 0x00, -1);
         } break;
         case (0x1D): {
             gb->cpu_clock += 4;
             gb->pc++;
             gb->e--;
-            gbSetFlags(gb, gb->e == 0, 1, gb->e == 0xFF, -1);
+            gbSetFlags(gb, gb->e == 0, 1, (gb->e & 0xF) == 0xF, -1);
         } break;
         case (0x1E): { 
             gb->cpu_clock += 4;
@@ -505,13 +505,13 @@ void gbExecute(Gameboy *gb) {
             gb->cpu_clock += 4;
             gb->pc++;
             gb->h++;
-            gbSetFlags(gb, gb->h == 0, 0, gb->h == 0, -1);
+            gbSetFlags(gb, gb->h == 0, 0, (gb->h & 0xF) == 0, -1);
         } break;
         case (0x25): {
             gb->cpu_clock += 4;
             gb->pc++;
             gb->h--;
-            gbSetFlags(gb, gb->h == 0, 1, gb->h == 0xFF, -1);
+            gbSetFlags(gb, gb->h == 0, 1, (gb->h & 0xF) == 0xF, -1);
         } break;
         case (0x26): { 
             gb->cpu_clock += 4;
@@ -575,7 +575,7 @@ void gbExecute(Gameboy *gb) {
         } break;
         case (0x2C): {
             gb->l++;
-            gbSetFlags(gb, gb->l == 0, 0,  gb->l == 0, -1);
+            gbSetFlags(gb, gb->l == 0, 0, (gb->l & 0xF) == 0, -1);
             gb->pc ++;
             gb->cpu_clock += 4;
         } break;
@@ -583,7 +583,7 @@ void gbExecute(Gameboy *gb) {
             gb->cpu_clock += 4;
             gb->pc++;
             gb->l--;
-            gbSetFlags(gb, gb->l == 0, 1, gb->l == 0xFF, -1);
+            gbSetFlags(gb, gb->l == 0, 1, (gb->l & 0xF) == 0xF, -1);
         } break;
         case (0x2E): { 
             gb->cpu_clock += 4;
@@ -593,7 +593,7 @@ void gbExecute(Gameboy *gb) {
         case (0x2F): {
             gb->cpu_clock += 4;
             gb->pc++;
-            gbXOR(gb, 0xFF);
+            gb->a = ~gb->a;
             gbSetFlags(gb, -1, 1, 1, -1);
         } break;
         case (0x30): {
@@ -683,7 +683,7 @@ void gbExecute(Gameboy *gb) {
         } break;
         case (0x3C): {
             gb->a++;
-            gbSetFlags(gb, gb->a == 0, 0,  gb->a == 0, -1);
+            gbSetFlags(gb, gb->a == 0, 0, (gb->a & 0xF) == 0, -1);
             gb->pc ++;
             gb->cpu_clock += 4;
         } break;
@@ -691,7 +691,7 @@ void gbExecute(Gameboy *gb) {
             gb->cpu_clock += 4;
             gb->pc++;
             gb->a--;
-            gbSetFlags(gb, gb->a == 0, 1, gb->a == 0xFF, -1);
+            gbSetFlags(gb, gb->a == 0, 1, (gb->a & 0xF) == 0xF, -1);
         } break;
         case (0x3E): { 
             gb->cpu_clock += 8;
@@ -701,9 +701,7 @@ void gbExecute(Gameboy *gb) {
         case (0x3F): {
             gb->cpu_clock += 4;
             gb->pc++;
-            u8 scy = gbRead(gb, IO_SCY);
-            gbWrite(gb, IO_SCY, scy ^ 1);
-            gbSetFlags(gb, -1, 0, 0, 1);
+            gbSetFlags(gb, -1, 0, 0, (gb->f & C_FLAG) == 0);
         } break;
         case(0x76): { 
             gb->halted = true;
