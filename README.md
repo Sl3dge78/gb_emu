@@ -11,7 +11,7 @@ Run fairly smoothly on my machine. No optimization done at all.
  - [X] 06-ld r,r
  - [X] 07-jr,jp,call,ret,rst
  - [X] 08-misc instrs
- - [ ] 09-op r,r
+ - [X] 09-op r,r
  - [X] 10-bit ops
  - [X] 11-op a,(hl)
 
