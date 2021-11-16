@@ -533,7 +533,6 @@ void gbLCD(Gameboy *gb) {
     LY++;
     if(LY == 154) {
         LY = 0;
-        //memset(gb->lcd_screen, 0, SCREEN_WIDTH * SCREEN_HEIGHT);
     }
     gbWriteAt(gb, 0xFF44, LY, 0);
     
@@ -572,7 +571,11 @@ void gbLCD(Gameboy *gb) {
 void gbLoop(Gameboy *gb, f32 delta_time) {
     
     if(!gb->step_through) {
-        gb->cycles_left = delta_time * gb->clock_speed * gb->clock_mul;
+        // Cap the amount of instructions for each frame 
+        if(delta_time > 0.1f) 
+            gb->cycles_left = -1;
+        else
+            gb->cycles_left = delta_time * gb->clock_speed * gb->clock_mul;
     }
     
     const u8 *keyboard = SDL_GetKeyboardState(0);
@@ -844,24 +847,14 @@ void gbDrawDebug(Gameboy *gb, SDL_Rect rect, Console *console, SDL_Renderer *ren
         u32 y_section = 10;
         
         { // Disassembly
-            
             RenderLine(renderer, x_section, &y_section, "DISASSEMBLY");
             u32 pc = gb->pc;
-            for(u32 i = 0; i < 9; i ++) {
+            for(u32 i = 0; i < 19; i ++) {
                 gbDrawDissassembly(gb, &pc, x_section, &y_section, renderer);
             }
             RenderLine(renderer, x_section, &y_section, " ");
         }
         
-        {   // ROM
-            const u32 lines = 8;
-            i32 start_addr = gb->pc - (gb->pc % 16) - (lines / 2) * 16;
-            while(start_addr < 0) {
-                start_addr += 16;
-            }
-            RenderLine(renderer, x_section, &y_section, "ROM");
-            DebugDrawMemLines(gb, start_addr, lines, &x_section, &y_section, renderer, gb->pc);
-        }
         
         {   // LAST READ
             const u32 lines = 8;
@@ -871,7 +864,7 @@ void gbDrawDebug(Gameboy *gb, SDL_Rect rect, Console *console, SDL_Renderer *ren
             }
             u32 x = x_section_start;
             RenderLine(renderer, x, &y_section, "LAST READ");
-            DebugDrawMemLines(gb, start_addr, lines, &x, &y_section, renderer, gb->last_read);
+            DebugDrawMemLines(gb, start_addr, lines, &x_section, &y_section, renderer, gb->last_read);
         }
         {   // LAST WRITE
             const u32 lines = 8;
@@ -890,9 +883,19 @@ void gbDrawDebug(Gameboy *gb, SDL_Rect rect, Console *console, SDL_Renderer *ren
         x_section_start = x_section;
         y_section_start = 10;
         y_section = y_section_start;
+        {   // ROM
+            const u32 lines = 8;
+            i32 start_addr = gb->pc - (gb->pc % 16) - (lines / 2) * 16;
+            while(start_addr < 0) {
+                start_addr += 16;
+            }
+            RenderLine(renderer, x_section, &y_section, "ROM");
+            DebugDrawMemLines(gb, start_addr, lines, &x_section, &y_section, renderer, gb->pc);
+        }
         {   // OAM
             RenderLine(renderer, x_section_start, &y_section, "OAM");
-            DebugDrawMemLines(gb, MEM_OAM_START, MEM_OAM_SIZE / 16 + 1, &x_section, &y_section, renderer, gb->hl);
+            u32 x = x_section_start;
+            DebugDrawMemLines(gb, MEM_OAM_START, MEM_OAM_SIZE / 16 + 1, &x, &y_section, renderer, gb->hl);
         }
         {   // IO
             RenderLine(renderer, x_section_start, &y_section, "IO");
@@ -904,16 +907,6 @@ void gbDrawDebug(Gameboy *gb, SDL_Rect rect, Console *console, SDL_Renderer *ren
             RenderLine(renderer, x_section_start, &y_section, "HRAM");
             u32 x = x_section_start;
             DebugDrawMemLines(gb, MEM_HRAM_START, 0x80 / 16, &x, &y_section, renderer, gb->last_write);
-        }
-        {   // HL
-            const u32 lines = 8;
-            i32 start_addr = gb->hl - (gb->hl % 16) - (lines / 2) * 16;
-            while(start_addr < 0) {
-                start_addr += 16;
-            }
-            u32 x = x_section_start;
-            RenderLine(renderer, x, &y_section, "HL");
-            DebugDrawMemLines(gb, start_addr, lines, &x, &y_section, renderer, gb->hl);
         }
         
         // New column

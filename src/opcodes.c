@@ -20,7 +20,7 @@ Opcode OPCODE_DESC_TABLE[0X100] = {
     {"DEC C",1},
     {"LD C,d8",2},
     {"RRCA",1},
-    {"STOP 0",2},
+    {"STOP",1},
     {"LD DE,d16",3},
     {"LD (DE),A",1},
     {"INC DE",1},
@@ -378,6 +378,7 @@ void gbExecute(Gameboy *gb) {
             gb->cpu_clock += 10;
             gb->pc++;
             gb->step_through = true;
+            gb->halted = true;
             SDL_Log("Stop Instruction");
         } break;
         case (0x11) : { 
@@ -670,13 +671,12 @@ void gbExecute(Gameboy *gb) {
             }
         } break;
         case (0x39): {
+            //gbBreakpoint(gb);
             gb->cpu_clock += 8;
             gb->pc++;
-            u16 low_sum = gb->l + gb->sp & 0xFF;
-            gb->l = low_sum & 0xFF;
-            u16 high_sum = gb->h + (gb->sp >> 8 & 0xFF) + (low_sum >> 8 & 0xFF);
-            gb->h = high_sum & 0xFF;
-            gbSetFlags(gb, -1, 0, low_sum > 0xFF, high_sum > 0xFF);
+            u32 val = gb->hl + gb->sp;
+            gbSetFlags(gb, -1, 0, ((gb->hl & 0xFFF) + (gb->sp & 0xFFF)  > 0xFFF), val > 0xFFFF);
+            gb->hl = val & 0xFFFF;
         } break;
         case (0x3A): { 
             gb->cpu_clock += 8;
@@ -1039,20 +1039,15 @@ void gbExecute(Gameboy *gb) {
             StackPush(&gb->call_stack, from, gb->pc);
         } break;
         case(0xE8): {
+            //gbBreakpoint(gb);
             gb->pc++;
             gb->cpu_clock += 16;
             
-            u16 lower = gb->sp & 0xFF;
-            u16 higher = gb->sp & 0xFF00;
             i8 add = gbReadAt(gb, gb->pc++, 0);
+            u32 result = gb->sp + add;
             
-            lower += add & 0xFF;
-            higher += lower & 0xFF00 + add & 0xFF00; 
-            
-            gb->pc = lower | higher << 8;
-            
-            gbSetFlags(gb, 0, 0, (lower & 0xFF00) != 0, (higher & 0xFF00) != 0);
-            
+            gbSetFlags(gb, 0, 0, ((gb->sp & 0xF) + (add & 0xF)) > 0xF , ((gb->sp & 0xFF) + (add & 0xFF)) > 0xFF);
+            gb->sp = result & 0xFFFF;
         } break;
         case(0xE9): {
             u16 from = gb->pc;
@@ -1129,13 +1124,11 @@ void gbExecute(Gameboy *gb) {
         case(0xF8): {
             gb->pc++;
             gb->cpu_clock += 16;
-            u16 lower = gb->sp & 0x00FF;
-            u16 higher = (gb->sp & 0xFF00) >> 8;
             i8 add = gbReadAt(gb, gb->pc++, 0);
-            lower += add & 0xFF;
-            higher += lower & 0xFF00 + add & 0xFF00; 
-            gb->hl = lower | higher << 8;
-            gbSetFlags(gb, 0, 0, (lower & 0xFF00) != 0, (higher & 0xFF00) != 0);
+            u32 result = gb->sp + add;
+            
+            gbSetFlags(gb, 0, 0, ((gb->sp & 0xF) + (add & 0xF)) > 0xF , ((gb->sp & 0xFF) + (add & 0xFF)) > 0xFF);
+            gb->hl = result & 0xFFFF;
         } break;
         case(0xF9): {
             gb->pc++;

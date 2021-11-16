@@ -5,7 +5,7 @@ Run fairly smoothly on my machine. No optimization done at all.
 ### Blargg's Tests Progress
  - [X] 01-special
  - [X] 02-interrupts
- - [ ] 03-op sp,hl
+ - [X] 03-op sp,hl
  - [ ] 04-op r,imm
  - [ ] 05-op rp
  - [X] 06-ld r,r
