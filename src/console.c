@@ -1,3 +1,9 @@
+#include <string.h>
+#include <SDL/SDL.h>
+#include <SDL/SDL_ttf.h>
+
+#include "gb.h"
+
 typedef struct ConsoleEntry {
     char command[128];
 } ConsoleEntry;

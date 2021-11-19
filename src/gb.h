@@ -1,5 +1,7 @@
 #pragma once
 
+#include "utils.h"
+
 #define SCREEN_WIDTH  160
 #define SCREEN_HEIGHT 144
 
@@ -208,3 +210,6 @@ void gbOR(Gameboy *gb, u8 operand);
 void gbCP(Gameboy *gb, u8 operand);
 
 void gbBreakpoint(Gameboy *gb);
+
+internal void RenderText(SDL_Renderer *renderer, u32 *x, u32 y, const char *fmt, ...);
+internal void RenderLine(SDL_Renderer *renderer, u32 x, u32 *y, const char *fmt, ...);

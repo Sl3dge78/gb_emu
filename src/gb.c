@@ -1,3 +1,49 @@
+#include <stdio.h>
+
+#include "utils.h"
+#include "gb.h"
+
+internal void RenderLine(SDL_Renderer *renderer, u32 x, u32 *y, const char *fmt, ...) {
+    
+    va_list ap;
+    va_start(ap, fmt);
+    char buf[1024] = {'\0'};
+    vsnprintf(buf, 1024, fmt, ap);
+    va_end(ap);
+    
+    SDL_Surface *surf = TTF_RenderText_Blended(global_font, buf, (SDL_Color){200, 200, 200, 255});
+    SDL_Texture *tex = SDL_CreateTextureFromSurface(renderer, surf);
+    
+    SDL_Rect dst = {x, *y, surf->w, surf->h};
+    
+    SDL_RenderCopy(renderer, tex, NULL, &dst);
+    
+    SDL_FreeSurface(surf);
+    SDL_DestroyTexture(tex);
+    *y += dst.h;
+}
+
+internal void RenderText(SDL_Renderer *renderer, u32 *x, u32 y, const char *fmt, ...) {
+    
+    va_list ap;
+    va_start(ap, fmt);
+    char buf[1024] = {'\0'};
+    vsnprintf(buf, 1024, fmt, ap);
+    va_end(ap);
+    
+    SDL_Color col;
+    SDL_GetRenderDrawColor(renderer, &col.r, &col.g, &col.b, &col.a);
+    SDL_Surface *surf = TTF_RenderText_Blended(global_font, buf, col);
+    SDL_Texture *tex = SDL_CreateTextureFromSurface(renderer, surf);
+    
+    SDL_Rect dst = {*x, y, surf->w, surf->h};
+    
+    SDL_RenderCopy(renderer, tex, NULL, &dst);
+    
+    SDL_FreeSurface(surf);
+    SDL_DestroyTexture(tex);
+    *x += dst.w;
+}
 
 void StackPush(Stack *stack, u16 from, u16 to) {
     for(i32 i = stack->capacity; i > 0 ; i--) {
@@ -20,8 +66,6 @@ typedef struct TileLine {
     u8 data_1;
     u8 data_2;
 } TileLine;
-
-
 
 internal void PrintHex(u8 *ptr, u32 nb) {
     u32 l = 0;
@@ -75,7 +119,6 @@ void gbBreakpoint(Gameboy *gb) {
     gb->cycles_left = -1;
 }
 
-
 void gbWriteAt(Gameboy *gb, u16 address, u8 value, bool log) {
     if(log)
         gb->last_write = address;
@@ -128,6 +171,7 @@ void gbWriteAt(Gameboy *gb, u16 address, u8 value, bool log) {
         case (IO_STAT) : return; // Prevent writing
         case (IO_IF)   : value |= 0xE0; break;
         case (IO_TAC)  : value |= 0xF8; break;
+        case (IO_DIV)  : gb->timer = 0; break;
     }
     
     if(address >= MEM_MIRROR0_START && address <= MEM_MIRROR1_END) {
@@ -573,19 +617,14 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
     
     if(!gb->step_through) {
         // Cap the amount of instructions for each frame 
-        if(delta_time > 0.1f) 
-            gb->cycles_left = -1;
-        else
-            gb->cycles_left = delta_time * gb->clock_speed * gb->clock_mul;
+        gb->cycles_left = delta_time * gb->clock_speed * gb->clock_mul;
+        if(gb->cycles_left > 69905) gb->cycles_left = 69905; // Clockspeed * 1 / 60
     }
     
     const u8 *keyboard = SDL_GetKeyboardState(0);
     
     while(gb->cycles_left >= 0) {
         if(gb->cpu_clock <= 0) {
-            if(!gb->halted) 
-                gbExecute(gb);
-            
             for(u32 i = 0; i < gb->breakpoint_count; i ++) {
                 if(gb->pc == gb->breakpoints[i]) {
                     gb->step_through = true;
@@ -595,13 +634,23 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
             if(gb->step_through) {
                 gb->cycles_left = 0;
             }
+
+            if(!gb->halted) 
+                gbExecute(gb);           
         } 
         while(gb->ppu_clock <= 0)
             gbLCD(gb);
         
-        // Timer update
-        gbWriteAt(gb, IO_DIV, gbReadAt(gb, IO_DIV, 0) + 1, 0);
-        
+        // DMA
+        if(gb->DMA_cycles_left >= 0) {
+            u16 addr_read = gbReadAt(gb, 0xFF46, 0) << 8;
+            addr_read |= gb->DMA_cycles_left;
+            u16 addr_write = 0xFE00 + gb->DMA_cycles_left;
+            
+            gbWriteAt(gb, addr_write, gbReadAt(gb, addr_read, 0), 0);
+            gb->DMA_cycles_left--;
+        }
+
         u8 TAC = gbReadAt(gb, IO_TAC,0 );
         if(TAC >> 2 & 1) { // Timer enabled
             gb->timer++;
@@ -622,17 +671,10 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
             
             gbWriteAt(gb, IO_TIMA, TIMA, 0);
         }
-        
-        // DMA
-        if(gb->DMA_cycles_left >= 0) {
-            u16 addr_read = gbReadAt(gb, 0xFF46, 0) << 8;
-            addr_read |= gb->DMA_cycles_left;
-            u16 addr_write = 0xFE00 + gb->DMA_cycles_left;
-            
-            gbWriteAt(gb, addr_write, gbReadAt(gb, addr_read, 0), 0);
-            gb->DMA_cycles_left--;
-        }
-        
+
+        // Timer update
+        gbWriteAt(gb, IO_DIV, gbReadAt(gb, IO_DIV, 0) + 1, 0);
+
         // Interrupts
         if(gb->ime) {
             u8 IF = gbReadAt(gb, IO_IF, 0);
@@ -838,6 +880,7 @@ void gbDrawDebug(Gameboy *gb, SDL_Rect rect, Console *console, SDL_Renderer *ren
         RenderLine(renderer, x, &y, "PPU CLK  %d", gb->ppu_clock);
         RenderLine(renderer, x, &y, "GBL CLK  %d", gb->cycles_left);
         RenderLine(renderer, x, &y, "SPD   %.3fx", gb->clock_mul);
+        RenderLine(renderer, x, &y, "Timer    %d", gb->timer);
         RenderLine(renderer, x, &y, "STEP     %d", gb->step_through);
     }
     

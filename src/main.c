@@ -1,4 +1,3 @@
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,87 +6,9 @@
 #include <SDL/SDL.h>
 #include <SDL/SDL_ttf.h>
 
-typedef int8_t  i8;
-typedef int16_t i16;
-typedef int32_t i32;
-typedef int64_t i64;
-
-typedef uint8_t  u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-typedef uint32_t u64;
-
-typedef float f32;
-typedef u8 bool;
-#define true 1
-#define false 0
-
-#define internal static
-#define global static
-
-#define assert(expression) __assert(expression, gb)
-
-
-#define BINARY_FMT(var) var >> 7 & 1, var >> 6 & 1, var >> 5 & 1, var >> 4 & 1, var >> 3 & 1, var >> 2 & 1, var >> 1 & 1, var >> 0 & 1
-
-global bool BREAKPOINT = false;
-global bool global_logverbose = true;
-global TTF_Font *global_font;
-
-typedef struct IO {
-    
-    bool mouse_down;
-    u32 mouse_x, mouse_y;
-    
-} IO;
-
-global IO io = {0};
-
-internal void RenderLine(SDL_Renderer *renderer, u32 x, u32 *y, const char *fmt, ...) {
-    
-    va_list ap;
-    va_start(ap, fmt);
-    char buf[1024] = {'\0'};
-    vsnprintf(buf, 1024, fmt, ap);
-    va_end(ap);
-    
-    SDL_Surface *surf = TTF_RenderText_Blended(global_font, buf, (SDL_Color){200, 200, 200, 255});
-    SDL_Texture *tex = SDL_CreateTextureFromSurface(renderer, surf);
-    
-    SDL_Rect dst = {x, *y, surf->w, surf->h};
-    
-    SDL_RenderCopy(renderer, tex, NULL, &dst);
-    
-    SDL_FreeSurface(surf);
-    SDL_DestroyTexture(tex);
-    *y += dst.h;
-}
-
-internal void RenderText(SDL_Renderer *renderer, u32 *x, u32 y, const char *fmt, ...) {
-    
-    va_list ap;
-    va_start(ap, fmt);
-    char buf[1024] = {'\0'};
-    vsnprintf(buf, 1024, fmt, ap);
-    va_end(ap);
-    
-    SDL_Color col;
-    SDL_GetRenderDrawColor(renderer, &col.r, &col.g, &col.b, &col.a);
-    SDL_Surface *surf = TTF_RenderText_Blended(global_font, buf, col);
-    SDL_Texture *tex = SDL_CreateTextureFromSurface(renderer, surf);
-    
-    SDL_Rect dst = {*x, y, surf->w, surf->h};
-    
-    SDL_RenderCopy(renderer, tex, NULL, &dst);
-    
-    SDL_FreeSurface(surf);
-    SDL_DestroyTexture(tex);
-    *x += dst.w;
-}
-
-#include "console.c"
+#include "utils.h"
 #include "gb.h"
-void __assert(bool value, Gameboy *gb);
+#include "console.c"
 #include "opcodes.c"
 #include "gb.c"
 
