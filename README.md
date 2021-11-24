@@ -2,9 +2,9 @@ Just another GameBoy emulator made for fun and learning. The code base is pretty
 Run fairly smoothly on my machine. No optimization done at all. 
 
 # Use 
-- Press F5 to toggle debug mode
-- Add your rom next to the exe and name it rom.gb
-Input :
+- Add your rom next to the exe and name it rom.gb   
+
+### Input
 - A : A
 - B : S
 - Start : X
@@ -13,6 +13,13 @@ Input :
 - Down : Down Arrow
 - Left : Left Arrow
 - Right : Right Arrow
+- Space : Pause/Resume execution
+
+### Other
+- Press F5 to toggle debug mode
+- N/F7 : Run to next intruction
+- Space/F9 : Toggle execution
+- Click on a line in the disassembly to set a breakpoint or edit bp.txt next to the .exe and add your addresses
 
 # Roadmap
 ### Blargg's Tests Progress
