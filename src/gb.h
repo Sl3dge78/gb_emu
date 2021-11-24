@@ -89,6 +89,8 @@ const u16 MEM_HRAM_SIZE   = MEM_HRAM_END - MEM_HRAM_START + 1;
 const u16 MEM_END         = 0xFFFF;
 const u32 MEM_SIZE        = 0x10000;
 
+const u8  MBC_TYPE_3 = 0x13;
+
 typedef struct Color {
     u8 r;
     u8 g;
@@ -158,7 +160,7 @@ typedef struct Gameboy {
     
     u8 cartridge_type;
     u8 rom_size;
-    u8 ram_size;
+    u32 ram_size;
     u8 rom_bank;
     u8 ram_bank;
     u8 ram_bank_mode;
@@ -169,7 +171,9 @@ typedef struct Gameboy {
     
     u8 keys_dpad;
     u8 keys_buttons;
-    
+  
+    u8 selected_rtc_register;
+
     // Our stuff
     i32 cpu_clock;
     i32 ppu_clock;

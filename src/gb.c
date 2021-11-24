@@ -134,20 +134,29 @@ void gbWriteAt(Gameboy *gb, u16 address, u8 value, bool log) {
     }
     // ROM bank number
     if(address >= 0x2000 && address <= 0x3FFF) {
-        if(value == 0 || value == 0x20 || value == 0x40 || value == 0x60 ) {
-            value++;
+        if(gb->cartridge_type != 0x13) {
+            if( value == 0x20 || value == 0x40 || value == 0x60 ) {
+                value++;
+            }
         }
+        if(value == 0)
+            value ++;
         gb->rom_bank = value;
         return;
     }
     // RAM Bank number / Upper bits of rom bank number
     if(address >= 0x4000 && address <= 0x5FFF) {
-        value &= 0x3;
+        u8 low_value = value & 0x3;
         if(gb->ram_bank_mode) {
             gb->ram_bank = value;
         } else {
             gb->rom_bank = (gb->rom_bank & 0b10011111) | value;
         }
+        u8 high_value = value & 0b00001100;
+        if(high_value && gb->cartridge_type == 0x13) {
+           gb->selected_rtc_register = high_value;
+        }
+
         return;
     }
     // Bank mode
@@ -188,17 +197,25 @@ u8 gbReadAt(Gameboy *gb, u16 address, bool log) {
         gb->last_read = address;
     
     if(address <= MEM_ROM00_END) {
-        return gb->rom[address];
+        switch(gb->selected_rtc_register) {
+            case 0:
+                return gb->rom[address];
+            case 0x08: 
+            case 0x09: 
+            case 0x0A: return 0;
+            case 0x0B: return 0;
+            case 0x0C: return 0;
+        }
     }
     if(address >= MEM_ROMNN_START && address <= MEM_ROMNN_END) {
-        u16 offset = gb->rom_bank * 0x4000;
-        u16 base_address = address - MEM_ROMNN_START;
+        u32 offset = gb->rom_bank * 0x4000;
+        u32 base_address = address - MEM_ROMNN_START;
         return gb->rom[base_address + offset];
     }
     
     if(address >= MEM_CARTRAM_START && address <= MEM_CARTRAM_END) {
-        u16 offset = gb->ram_bank * 0x2000;
-        u16 relative_address = address - MEM_CARTRAM_START;
+        u32 offset = gb->ram_bank * 0x2000;
+        u32 relative_address = address - MEM_CARTRAM_START;
         return gb->cart_ram[relative_address + offset];
     }
     
@@ -336,15 +353,24 @@ void gbLoadRom(Gameboy *gb, const char *path) {
     
     fread(gb->rom, 1, size, rom);
     fclose(rom);
-    
+    SDL_Log("Rom size is %d", size);
     gb->cartridge_type = gbReadAt(gb, 0x0147, 0);
-    if(gb->cartridge_type != 0x00 && gb->cartridge_type != 0x01) {
-        SDL_Log("Unsupported cartridge type %02X. Something might not work", gb->cartridge_type);
+    if(gb->cartridge_type != 0x00 && gb->cartridge_type != 0x01 && gb->cartridge_type != 0x13) {
+        SDL_Log("Unsupported cartridge type 0x%02X. Something might not work", gb->cartridge_type);
     }
     gb->rom_size = gbReadAt(gb, 0x0148, 0);
-    gb->ram_size = gbReadAt(gb, 0x0149, 0);
-    
-    gb->cart_ram = calloc(1, gb->ram_size);
+    u8 ram_size_value = gbReadAt(gb, 0x0149, 0);
+    switch(ram_size_value) {
+        case 0: gb->ram_size = 0; break;
+        case 1: gb->ram_size = 2048; break;
+        case 2: gb->ram_size = 8192; break;
+        case 3: gb->ram_size = 32768; break;
+        case 4: gb->ram_size = 131072; break;
+        case 5: gb->ram_size = 65536; break;
+    }
+    if(gb->ram_size != 0)
+        gb->cart_ram = calloc(1, gb->ram_size);
+    SDL_Log("Ram size is %d", gb->ram_size);
     
 }
 
