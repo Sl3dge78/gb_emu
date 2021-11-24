@@ -104,6 +104,20 @@ const Color palette[4] = {
     {0x08, 0x18, 0x20},
 };
 
+typedef union Palette {
+    u8 array[4];
+    u32 single; 
+
+} Palette;
+Palette GetPaletteFromByte(const u8 byte) {
+    Palette result = {0};
+    result.array[0] = byte & 0b11;
+    result.array[1] = (byte & 0b1100) >> 2;
+    result.array[2] = (byte & 0b110000) >> 4;
+    result.array[3] = (byte & 0b11000000) >> 6;
+    return result;
+}
+
 #define LOG_OPCODE SDL_LOG_CATEGORY_CUSTOM
 
 u8 Z_FLAG = 1 << 7;

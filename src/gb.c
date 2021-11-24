@@ -485,15 +485,32 @@ void gbInput(Gameboy *gb, SDL_KeyboardEvent *e, bool is_up) {
     
 }
 
-void gbRenderTileLine(Gameboy *gb, TileLine line, u32 *x, u8 y, u8 x_offset) {
+void gbRenderSpriteLine(Gameboy *gb, Palette p, TileLine line, u32 *x, u8 y, u8 x_offset) {
     
     for(i32 i = x_offset; i < 8; i++) {
         if(*x >= SCREEN_WIDTH)
             *x = 0;
-        gb->lcd_screen[y][*x] = (line.data_2 >> (7-i) & 1);
-        gb->lcd_screen[y][*x] <<= 1;
-        gb->lcd_screen[y][*x] |=  (line.data_1 >> (7-i) & 1);
+        u8 color_val = (line.data_2 >> (7-i) & 1);
+        color_val <<= 1;
+        color_val |=  (line.data_1 >> (7-i) & 1);
+        
+        u8 paletted_color = p.array[color_val];
+        if(paletted_color != 0)
+            gb->lcd_screen[y][*x] = paletted_color;
+
         (*x)++;
+    }
+}
+void gbRenderTileLine(Gameboy *gb, Palette p, TileLine line, u32 *x, u8 y, u8 x_offset) {
+    
+    for(i32 i = x_offset; i < 8; i++) {
+        if(*x >= SCREEN_WIDTH)
+            *x = 0;
+        u8 color_val = (line.data_2 >> (7-i) & 1);
+        color_val <<= 1;
+        color_val |=  (line.data_1 >> (7-i) & 1);
+        gb->lcd_screen[y][*x] = p.array[color_val];
+            (*x)++;
         
     }
 }
@@ -516,12 +533,85 @@ TileLine gbGetTileLine(Gameboy *gb, u8 tile_offset, bool mode, u8 line) {
         result.data_1 = gbReadAt(gb, 0x8000 + (tile_offset * 16) + (line * 2),0);
         result.data_2 = gbReadAt(gb, 0x8000 + (tile_offset * 16) + (line * 2) + 1,0);
     } else if(mode == 0) {
-        i16 tile_addr = *((i16 *)(&tile_offset));
-        tile_addr *= 16;
-        result.data_1 = gbReadAt(gb, 0x9000 + tile_addr + (line * 2),0);
-        result.data_2 = gbReadAt(gb, 0x9000 + tile_addr + (line * 2) + 1,0);
+        i8 tile_addr = *((i8 *)(&tile_offset));
+        //tile_addr *= 16;
+        result.data_1 = gbReadAt(gb, 0x9000 + tile_addr * 16 + (line * 2),0);
+        result.data_2 = gbReadAt(gb, 0x9000 + tile_addr * 16 + (line * 2) + 1,0);
     }
     return result;
+}
+
+void gbBackground(Gameboy *gb, u8 LCDC, u8 LY) {
+    u8 SCY  = gbReadAt(gb, IO_SCY ,0);
+    u8 SCX  = gbReadAt(gb, IO_SCX ,0);
+    u8 BGP  = gbReadAt(gb, IO_BGP ,0);
+
+    bool tile_data_select = LCDC >> 4 & 1;
+    bool bg_tile_map_select = LCDC >> 3 & 1;
+    // Render scanline
+    u32 x = 0;
+
+    // BG
+    u16 tile_map_base_address = bg_tile_map_select ? 0x9C00 : 0x9800;
+
+    // Offset the start by SCX and SCY
+    u16 tile_map_start = tile_map_base_address + SCX;
+    tile_map_start += (LY + SCY) / 8 * 32;
+
+    u8 x_offset = SCX % 8;
+
+    while(x < SCREEN_WIDTH) {
+        u8 line = (LY + SCY) % 8;
+        u8 tile_id = gbReadAt(gb, tile_map_start,0);
+        TileLine tl = gbGetTileLine(gb, tile_id, tile_data_select, line);
+        u16 y = LY + SCY;
+        if(y >= SCREEN_HEIGHT)
+            break;
+
+        gbRenderTileLine(gb, GetPaletteFromByte(BGP), tl, &x, y, x_offset);
+        tile_map_start++;
+    }
+}
+
+void gbWindow(Gameboy *gb, u8 LCDC, u8 LY) {
+    bool window_tile_data_select = LCDC >> 6 & 1;
+    bool window_display = LCDC >> 5 & 1;
+    if(window_display) {
+
+    }
+}
+
+void gbOAM(Gameboy *gb, u8 LCDC, u8 LY) {
+    u16 x = 0;
+    u8 sprite_count = 0;
+    u8 OBP0 = gbReadAt(gb, IO_OBP0 ,0);
+    u8 OBP1 = gbReadAt(gb, IO_OBP1 ,0);
+    for(u32 i = 0; i < 40; i++) {
+        if(sprite_count >= 10) 
+            break;
+        OAMSprite sprite = gbGetOAMSprite(gb, i);
+        bool is_palette_1 = sprite.flags >> 4 & 1;
+        Palette pal;
+        if(is_palette_1) {
+            pal = GetPaletteFromByte(OBP1);
+        } else {
+            pal = GetPaletteFromByte(OBP0);
+        }
+        if(sprite.y < 0x10)
+            continue;
+
+        sprite.y -= 0x10;
+        if(sprite.y <= LY && sprite.y + 8 >= LY) {
+            // Draw tile
+            u8 line = LY - sprite.y;
+            TileLine tl = gbGetTileLine(gb, sprite.tile, 1, line);
+            u32 sx = sprite.x - 0x08;
+            gbRenderSpriteLine(gb, pal, tl, &sx, LY, 0);
+            sprite_count++;
+        } else {
+            continue;
+        }
+    }
 }
 
 void gbLCD(Gameboy *gb) {
@@ -534,71 +624,19 @@ void gbLCD(Gameboy *gb) {
     }
     
     u8 STAT = gbReadAt(gb, IO_STAT ,0);
-    u8 SCY  = gbReadAt(gb, IO_SCY ,0);
-    u8 SCX  = gbReadAt(gb, IO_SCX ,0);
-    u8 LY   = gbReadAt(gb, IO_LY ,0);
-    u8 LYC  = gbReadAt(gb, IO_LYC ,0);
-    u8 BGP  = gbReadAt(gb, IO_BGP ,0);
-    u8 OBP0 = gbReadAt(gb, IO_OBP0 ,0);
-    u8 OBP1 = gbReadAt(gb, IO_OBP1 ,0);
     u8 WY   = gbReadAt(gb, IO_WY ,0);
     u8 WX   = gbReadAt(gb, IO_WX ,0);
-    
+    u8 LY   = gbReadAt(gb, IO_LY ,0);
+    u8 LYC  = gbReadAt(gb, IO_LYC ,0);
+
     if(LY < SCREEN_HEIGHT) {
-        bool window_tile_map_select = LCDC >> 6 & 1;
-        bool window_display = LCDC >> 5 & 1;
-        bool tile_data_select = LCDC >> 4 & 1;
-        bool bg_tile_map_select = LCDC >> 3 & 1;
-        
-        // Render scanline
-        u32 x = 0;
-        
-        // BG
-        u16 tile_map_base_address = bg_tile_map_select ? 0x9C00 : 0x9800;
-        
-        // Offset the start by SCX and SCY
-        u16 tile_map_start = tile_map_base_address + SCX;
-        tile_map_start += (LY + SCY) / 8 * 32;
-        
-        u8 x_offset = SCX % 8;
-        
-        while(x < SCREEN_WIDTH) {
-            u8 line = (LY + SCY) % 8;
-            u8 tile_id = gbReadAt(gb, tile_map_start,0);
-            TileLine tl = gbGetTileLine(gb, tile_id, tile_data_select, line);
-            u16 y = LY + SCY;
-            if(y >= SCREEN_HEIGHT)
-                break;
-            
-            gbRenderTileLine(gb, tl, &x, y, x_offset);
-            tile_map_start++;
-        }
-        
+        gbBackground(gb, LCDC, LY);
+        gbWindow(gb, LCDC, LY);
+        gbOAM(gb, LCDC, LY);
+        // Window
+       
         // OAM
-        x = 0;
-        u8 sprite_count = 0;
-        for(u32 i = 0; i < 40; i++) {
-            if(sprite_count >= 10) 
-                break;
-            OAMSprite sprite = gbGetOAMSprite(gb, i);
-            
-            if(sprite.y < 0x10)
-                continue;
-            
-            sprite.y -= 0x10;
-            if(sprite.y <= LY && sprite.y + 8 >= LY) {
-                // Draw tile
-                u8 line = LY - sprite.y;
-                TileLine tl = gbGetTileLine(gb, sprite.tile, 1, line);
-                u32 sx = sprite.x - 0x08;
-                gbRenderTileLine(gb, tl, &sx, LY, 0);
-                sprite_count++;
-            } else {
-                continue;
-            }
-        }
     }
-    
     
     // End of Drawing
     LY++;
