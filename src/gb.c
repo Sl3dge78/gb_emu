@@ -899,7 +899,6 @@ void gbDrawDebug(Gameboy *gb, SDL_Rect rect, Console *console, SDL_Renderer *ren
             RenderLine(renderer, x_section, &y_section, " ");
         }
         
-        
         {   // LAST READ
             const u32 lines = 8;
             i32 start_addr = gb->last_read - (gb->last_read % 16) - (lines / 2) * 16;

@@ -23,7 +23,7 @@ i32 main(i32 argc, char *argv[]) {
     
     SDL_Init(SDL_INIT_EVERYTHING);
     TTF_Init();
-    SDL_Window *window = SDL_CreateWindow("Gameboy", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, 0);
+    SDL_Window *window = SDL_CreateWindow("Gameboy", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
     
     Console console = {0};
@@ -40,6 +40,7 @@ i32 main(i32 argc, char *argv[]) {
     
     f32 delta_time = 0;
     u64 frame_start = SDL_GetPerformanceCounter();
+    bool draw_debug = false;
     while(gb.running) {
         u64 time = SDL_GetPerformanceCounter();
         delta_time = (f32)(time - frame_start) / 10000000.f;
@@ -47,11 +48,23 @@ i32 main(i32 argc, char *argv[]) {
         io.mouse_down = false;
         SDL_Event event;
         while (SDL_PollEvent(&event)) {  
-            switch(event.type) {
-                case SDL_QUIT : gb.running = false; break;
-                case SDL_KEYDOWN : gbInput(&gb, &event.key, 0); break;
-                case SDL_KEYUP   : gbInput(&gb, &event.key, 1); break;
-                case SDL_MOUSEBUTTONDOWN : { 
+          switch(event.type) {
+            case SDL_QUIT : gb.running = false; break;
+            case SDL_KEYDOWN : {
+               switch(event.key.keysym.scancode) {
+               case (SDL_SCANCODE_F5) : {
+                    draw_debug = !draw_debug;
+                    if(draw_debug)
+                        SDL_SetWindowSize(window, 1280, 720);
+                    else 
+                        SDL_SetWindowSize(window, SCREEN_WIDTH, SCREEN_HEIGHT);
+                    
+               } break;
+               default : gbInput(&gb, &event.key, 0); break;
+               }
+             } break;
+            case SDL_KEYUP   : gbInput(&gb, &event.key, 1); break;
+            case SDL_MOUSEBUTTONDOWN : { 
                     if(event.button.button == SDL_BUTTON_LEFT) {
                         io.mouse_down = true;
                         io.mouse_x = event.button.x;
@@ -78,13 +91,14 @@ i32 main(i32 argc, char *argv[]) {
         
         SDL_SetRenderDrawColor(renderer, 25, 25, 25, 255);
         SDL_RenderClear(renderer);
-        
+
         gbDraw(&gb, zoom, renderer);
-        //gbDrawDebug(&gb, (SDL_Rect){0, 0, SCREEN_WIDTH * zoom, SCREEN_HEIGHT * zoom}, &console, renderer);
-        
-        // Console
-        DrawConsole(renderer, &console, SCREEN_WIDTH * zoom, h);
-        
+
+        if(draw_debug) {
+            gbDrawDebug(&gb, (SDL_Rect){0, 0, SCREEN_WIDTH * zoom, SCREEN_HEIGHT * zoom}, &console, renderer);
+            DrawConsole(renderer, &console, SCREEN_WIDTH * zoom, h);
+        }
+
         SDL_RenderPresent(renderer);
     }
     

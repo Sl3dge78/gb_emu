@@ -1,6 +1,19 @@
 Just another GameBoy emulator made for fun and learning. The code base is pretty messy, and there's still a lof of work to do to make it fully functionnal. But it can currently play Tetris' start screen properly (that bit where the game plays on its own). It also features a full memory map view of the key places, breakpoints, and dissassembly.
 Run fairly smoothly on my machine. No optimization done at all. 
 
+# Use 
+- Press F5 to toggle debug mode
+- Add your rom next to the exe and name it rom.gb
+Input :
+- A : A
+- B : S
+- Start : X
+- Select : W
+- Up : Up Arrow
+- Down : Down Arrow
+- Left : Left Arrow
+- Right : Right Arrow
+
 # Roadmap
 ### Blargg's Tests Progress
  - [X] CPU Instructions 
