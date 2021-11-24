@@ -24,14 +24,13 @@ Run fairly smoothly on my machine. No optimization done at all.
     - [ ] Timer
         - [X] div_write
         - [ ] rapid_toggle
-        - [ ] tim00
-        - [ ] tim01
+        - [X] tim00
         - [ ] tim00_div_trigger
-        - [ ] tim01
+        - [X] tim01
         - [ ] tim01_div_trigger
-        - [ ] tim10
+        - [X] tim10
         - [ ] tim10_div_trigger
-        - [ ] tim11
+        - [X] tim11
         - [ ] tim11_div_trigger
         - [ ] tima_reload
         - [ ] time_write_reloading

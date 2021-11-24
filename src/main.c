@@ -80,7 +80,7 @@ i32 main(i32 argc, char *argv[]) {
         SDL_RenderClear(renderer);
         
         gbDraw(&gb, zoom, renderer);
-        gbDrawDebug(&gb, (SDL_Rect){0, 0, SCREEN_WIDTH * zoom, SCREEN_HEIGHT * zoom}, &console, renderer);
+        //gbDrawDebug(&gb, (SDL_Rect){0, 0, SCREEN_WIDTH * zoom, SCREEN_HEIGHT * zoom}, &console, renderer);
         
         // Console
         DrawConsole(renderer, &console, SCREEN_WIDTH * zoom, h);

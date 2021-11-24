@@ -663,7 +663,6 @@ void gbExecute(Gameboy *gb) {
             }
         } break;
         case (0x39): {
-            //gbBreakpoint(gb);
             gb->cpu_clock += 8;
             gb->pc++;
             u32 val = gb->hl + gb->sp;

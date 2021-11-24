@@ -1,7 +1,0 @@
-[
-    {
-        "directory": "W:/gb_emu",
-        "command": "clang src/main.c -g -o bin/gb.exe -I \"W:/_include\" -L \"W:/_lib\" ",
-        "file": "src/main.c"
-    }
-]

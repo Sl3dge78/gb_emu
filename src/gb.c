@@ -171,7 +171,7 @@ void gbWriteAt(Gameboy *gb, u16 address, u8 value, bool log) {
         case (IO_STAT) : return; // Prevent writing
         case (IO_IF)   : value |= 0xE0; break;
         case (IO_TAC)  : value |= 0xF8; break;
-        case (IO_DIV)  : gb->timer = 0; break;
+        case (IO_DIV)  : if(log) gb->timer = 0; break;
     }
     
     if(address >= MEM_MIRROR0_START && address <= MEM_MIRROR1_END) {
@@ -695,12 +695,12 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
         
         // Inputs
         u8 JOY = gbReadAt(gb, IO_JOY, 0);
-        if(JOY & (1 << 5)) { // Button
-            JOY = 0b11100000;
+        if(JOY & (1 << 4)) { // Button
+            JOY = 0b11010000;
             JOY |= gb->keys_buttons & 0x0F;
         }
-        if(JOY & (1 << 4)) { // D-Pad
-            JOY = 0b11010000;
+        if(JOY & (1 << 5)) { // D-Pad
+            JOY = 0b11100000;
             JOY |= gb->keys_dpad & 0x0F;
         }
         gbWriteAt(gb, IO_JOY, JOY, 0);
