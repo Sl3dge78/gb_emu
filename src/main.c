@@ -7,14 +7,17 @@
 #include <SDL/SDL_ttf.h>
 
 #include "utils.h"
+#include "rom.h"
 #include "gb.h"
+
 #include "console.c"
 #include "opcodes.c"
 #include "gb.c"
+#include "rom.c"
 
-void __assert(bool value, Gameboy *gb) {
+void __assert(bool value) {
     if (!value){ 
-        SDL_Log("Assertion error at %04X", gb->pc); 
+        SDL_Log("Assertion error"); 
         BREAKPOINT = true; 
     }
 }

@@ -21,7 +21,7 @@ typedef u8 bool;
 #define internal static
 #define global static
 
-#define assert(expression) __assert(expression, gb)
+#define assert(expression) __assert(expression)
 
 #define BINARY_FMT(var) var >> 7 & 1, var >> 6 & 1, var >> 5 & 1, var >> 4 & 1, var >> 3 & 1, var >> 2 & 1, var >> 1 & 1, var >> 0 & 1
 
@@ -39,4 +39,4 @@ typedef struct IO {
 global IO io = {0};
 
 typedef struct Gameboy Gameboy;
-void __assert(bool value, Gameboy *gb);
+void __assert(bool value);

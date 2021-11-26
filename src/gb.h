@@ -50,12 +50,9 @@
 #define INT_SERIAL  3
 #define INT_JOYPAD  4
 
-const u16 MEM_ROM00_START   = 0x0000;
-const u16 MEM_ROM00_END     = 0x3FFF;
-const u16 MEM_ROM00_SIZE    = MEM_ROM00_END - MEM_ROM00_START + 1;
-const u16 MEM_ROMNN_START   = 0x4000;
-const u16 MEM_ROMNN_END     = 0x7FFF;
-const u16 MEM_ROMNN_SIZE    = MEM_ROMNN_END - MEM_ROMNN_START + 1;
+const u16 MEM_ROM_START   = 0x0000;
+const u16 MEM_ROM_END     = 0x7FFF;
+const u16 MEM_ROM_SIZE    = MEM_ROM_END - MEM_ROM_START + 1;
 const u16 MEM_VRAM_START  = 0x8000;
 const u16 MEM_VRAM_END    = 0x9FFF;
 const u16 MEM_VRAM_SIZE   = MEM_VRAM_END - MEM_VRAM_START + 1;
@@ -88,8 +85,6 @@ const u16 MEM_HRAM_END    = 0xFFFF;
 const u16 MEM_HRAM_SIZE   = MEM_HRAM_END - MEM_HRAM_START + 1;
 const u16 MEM_END         = 0xFFFF;
 const u32 MEM_SIZE        = 0x10000;
-
-const u8  MBC_TYPE_3 = 0x13;
 
 typedef struct Color {
     u8 r;
@@ -135,7 +130,7 @@ void StackPush(Stack *stack, u16 from, u16 to);
 
 typedef struct Gameboy {
     // Memory
-    u8 *rom;
+    Rom rom;
     u8 *mem;
     u8 ime;
     
@@ -172,23 +167,12 @@ typedef struct Gameboy {
     u16 sp;
     u16 pc;
     
-    u8 cartridge_type;
-    u8 rom_size;
-    u32 ram_size;
-    u8 rom_bank;
-    u8 ram_bank;
-    u8 ram_bank_mode;
-    
-    u8 *cart_ram;
-    
     u16 timer;
     
     u8 keys_dpad;
     u8 keys_buttons;
   
-    u8 selected_rtc_register;
-
-    // Our stuff
+    // Internals
     i32 cpu_clock;
     i32 ppu_clock;
     i32 cycles_left;
@@ -216,8 +200,8 @@ void gbWriteAt(Gameboy *gb, const u16 address, const u8 value, bool log);
 u8 gbReadAt(Gameboy *gb, const u16 address, bool debug);
 #define gbRead(gb, add) gbReadAt(gb, add, 1)
 
-u8 *gbGetPointerTo(Gameboy *gb, const u16 address);
-u8 *gbGetRegisterFromID(Gameboy *gb, u8 id);
+u8 gbGetFromByteCode(Gameboy *gb, u8 id);
+void gbSetFromByteCode(Gameboy *gb, u8 id, u8 value);
 
 void gbSetFlags(Gameboy *gb, i32 Z, i32 N, i32 H, i32 C);
 void gbADD(Gameboy *gb, u8 operand, u8 carry);

@@ -233,7 +233,7 @@ Opcode OPCODE_DESC_TABLE[0X100] = {
     
     {"LDH (FF00+a8),A",2}, // E0
     {"POP HL",1},
-    {"LD (0xFF00+C),A",2},
+    {"LD (0xFF00+C),A",1},
     {"",0},
     {"",0},
     {"PUSH HL",1},
@@ -1162,7 +1162,7 @@ void gbExecute(Gameboy *gb) {
             gb->cpu_clock += 4;
         } else if(op_code >= 0x80 && op_code <= 0xBF) { // MATHS
             u8 b2 = (op_code & 0xF);
-            u8 operand = *gbGetRegisterFromID(gb, b2 % 8);
+            u8 operand = gbGetFromByteCode(gb, b2 % 8);
             u8 b1 = (op_code >> 4) & 0xF - 0x8;
             b1 *= 2;
             if (b2 > 7) {
@@ -1200,15 +1200,13 @@ void gbInstructionLD(Gameboy *gb, u8 op_code) {
     }
     b2 = b2 % 8;
     
-    u8 *r1 = gbGetRegisterFromID(gb, b1);
-    u8 *r2 = gbGetRegisterFromID(gb, b2);
-    *r1 = *r2;
+    gbSetFromByteCode(gb, b1, gbGetFromByteCode(gb, b2));
 }
 
 
 void gbPrefixCB(Gameboy *gb) {
-    u8 code = gbReadAt(gb, gb->pc++, 0);
-    u8 *src = gbGetRegisterFromID(gb, (code & 0x0F) % 8);
+    const u8 code = gbReadAt(gb, gb->pc++, 0);
+    u8 src = gbGetFromByteCode(gb, (code & 0x0F) % 8);
     
     if((code & 0x0F) % 8 == 6) 
         gb->cpu_clock += 8;
@@ -1224,70 +1222,70 @@ void gbPrefixCB(Gameboy *gb) {
     switch(first) {
         case(0) :{ // RLC -- RRC
             if(!above_8) {
-                u8 bit = (*src & 0x80);
-                *src <<= 1; 
-                *src |= bit >> 7;
+                u8 bit = (src & 0x80);
+                src <<= 1; 
+                src |= bit >> 7;
                 C = bit >> 7;
             } else {
-                u8 bit = (*src & 0x01);
-                *src >>= 1;
-                *src |= bit << 7;
+                u8 bit = (src & 0x01);
+                src >>= 1;
+                src |= bit << 7;
                 C = bit;
             }
-            Z = *src == 0;
+            Z = src == 0;
         } break;
         case(1) :{ // RL -- 
             if(!above_8) {
-                u8 bit = (*src & 0x80);
-                *src <<= 1; 
+                u8 bit = (src & 0x80);
+                src <<= 1; 
                 C = bit >> 7;
-                *src += (gb->f & C_FLAG) != 0;
-                Z = *src == 0;
+                src += (gb->f & C_FLAG) != 0;
+                Z = src == 0;
             } else { // RR
-                u8 bit = (*src & 0x01);
-                *src >>= 1;
+                u8 bit = (src & 0x01);
+                src >>= 1;
                 C = bit;
-                *src |= ((gb->f & C_FLAG) != 0) << 7;
+                src |= ((gb->f & C_FLAG) != 0) << 7;
             }
-            Z = *src == 0;
+            Z = src == 0;
         } break;
         case(2) :{ // SLA 
             if(!above_8) {
-                C = (*src & 0b10000000) != 0;
-                *src <<= 1; 
-                Z = *src == 0;
+                C = (src & 0b10000000) != 0;
+                src <<= 1; 
+                Z = src == 0;
             } else { // SRA
-                u8 bit = (*src & 0x80);
-                C = *src & 0x01;
-                *src >>= 1;
-                *src |= bit;
-                Z = *src == 0;
+                u8 bit = (src & 0x80);
+                C = src & 0x01;
+                src >>= 1;
+                src |= bit;
+                Z = src == 0;
             }
-            Z = *src == 0;
+            Z = src == 0;
         } break;
         case(3) : {
             if(!above_8) { // swap
-                u8 high = *src & 0xF0;
-                u8 low = *src & 0x0F;
-                *src = (high >> 4) | (low << 4);
+                u8 high = src & 0xF0;
+                u8 low = src & 0x0F;
+                src = (high >> 4) | (low << 4);
             } else { // SRL
-                u8 bit = (*src & 1);
-                *src >>= 1; 
+                u8 bit = (src & 1);
+                src >>= 1; 
                 C = bit;
             }
-            Z = *src == 0;
+            Z = src == 0;
         } break;
         default : 
         if(first >= 0x4 && first <= 0x7) { // BIT
             u8 bit = (first - 0x4) * 2 + above_8;
-            Z = (((*src >> bit) & 1) == 0);
+            Z = (((src >> bit) & 1) == 0);
             N = 0;
             H = 1;
             C = -1;
         } else if(first >= 0x8 && first <= 0xB) { // RES
             u8 bit = (first - 0x8) * 2 + above_8;
             
-            *src &= ~(1 << bit);
+            src &= ~(1 << bit);
             
             Z = -1;
             N = -1;
@@ -1296,7 +1294,7 @@ void gbPrefixCB(Gameboy *gb) {
         } else { // SET
             u8 bit = (first - 0xC) * 2 + above_8;
             
-            *src |= 1 << bit;
+            src |= 1 << bit;
             
             Z = -1;
             N = -1;
@@ -1307,4 +1305,5 @@ void gbPrefixCB(Gameboy *gb) {
     }
     gbSetFlags(gb, Z, N, H, C);
     gb->cpu_clock += 8;
+    gbSetFromByteCode(gb, (code & 0x0F) % 8, src);
 }
