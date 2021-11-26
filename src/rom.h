@@ -31,6 +31,7 @@ typedef struct Rom {
 
 bool RomCheckForCartridgeCompatibility(u8 cartridge_type);
 void RomLoad(Rom *rom, const char* path);
+void RomReset(Rom *rom);
 void RomUnload(Rom *rom);
 u8   RomRead(Rom *rom, u16 address);
 void RomWrite(Rom *rom,u16 address, u8 value);

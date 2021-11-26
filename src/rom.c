@@ -38,7 +38,11 @@ void RomLoad(Rom *rom, const char *path) {
     if(rom->ram_size != 0)
         rom->ram_data = calloc(1, rom->ram_size);
     SDL_Log("Ram size is %d", rom->ram_size);
+    
+    RomReset(rom);
+}
 
+void RomReset(Rom *rom) {
     rom->bank_mode = 0;
     rom->rom_bank = 1;
     rom->ram_bank = 0;
@@ -73,7 +77,7 @@ void RomWrite(Rom *rom, u16 address, u8 value) {
                 // @todo Not simulated 
                 return;
             } else if (address >= 0x2000 && address <= 0x2FFF) { // ROM bank
-                rom->rom_bank |= value & 0b00011111;
+                rom->rom_bank = value & 0b00011111;
                 if(rom->rom_bank == 0 || rom->rom_bank == 0x20 || rom->rom_bank == 0x40 || rom->rom_bank == 0x60) {
                     rom->rom_bank++;
                 }

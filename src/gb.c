@@ -296,6 +296,7 @@ void gbReset(Gameboy *gb) {
     gbWrite(gb, IO_IE, 0x00); 
     gbWrite(gb, IO_TAC, 0x00); 
     gbWrite(gb, 0x2000, 0x01); // Select rom bank 1
+    RomReset(&gb->rom);
 }
 
 void gbInit(Gameboy *gb) {
