@@ -419,14 +419,11 @@ void gbRenderSpriteLine(Gameboy *gb, Palette p, TileLine line, u32 *x, u8 y, boo
 void gbRenderTileLine(Gameboy *gb, Palette p, TileLine line, u32 *x, u8 y, u8 x_offset) {
     
     for(i32 i = x_offset; i < 8; i++) {
-        if(*x >= SCREEN_WIDTH)
-            *x = 0;
         u8 color_val = (line.data_2 >> (7-i) & 1);
         color_val <<= 1;
         color_val |=  (line.data_1 >> (7-i) & 1);
         gb->lcd_screen[y][*x] = p.array[color_val];
-            (*x)++;
-        
+        (*x)++;
     }
 }
 
@@ -442,7 +439,7 @@ OAMSprite gbGetOAMSprite(Gameboy *gb, u16 tile_id) {
     return result;
 }
 
-TileLine gbGetTileLine(Gameboy *gb, u8 tile_offset, bool mode, u8 line) {
+inline TileLine gbGetTileLine(Gameboy *gb, u8 tile_offset, bool mode, u8 line) {
     TileLine result = {0};
     if(mode == 1) {
         result.data_1 = gbReadAt(gb, 0x8000 + (tile_offset * 16) + (line * 2),0);
@@ -464,27 +461,26 @@ void gbBackground(Gameboy *gb, u8 LCDC, u8 LY) {
     bool tile_data_select = LCDC >> 4 & 1;
     bool bg_tile_map_select = LCDC >> 3 & 1;
     // Render scanline
-    u32 x = 0;
-
-    // BG
+    
     u16 tile_map_base_address = bg_tile_map_select ? 0x9C00 : 0x9800;
 
-    // Offset the start by SCX and SCY
-    u16 tile_map_start = tile_map_base_address + SCX;
-    tile_map_start += (LY + SCY) / 8 * 32;
+    u8 map_line  = ((LY + SCY) / 8) % 32;
+    u8 tile_line = (LY + SCY) % 8;
+    
+    Palette bg_pal = GetPaletteFromByte(gbReadAt(gb, IO_BGP, 0));
 
-    u8 x_offset = SCX % 8;
+    for(u16 x = 0; x < SCREEN_WIDTH; x++) {
+        u8 map_x = ((SCX + (u8)x) / 8) % 32;
+        u16 address = (tile_map_base_address + map_x) + (map_line * 32);
+        u8 tile_id = gbReadAt(gb, address, 0);
+        TileLine tl = gbGetTileLine(gb, tile_id, tile_data_select, tile_line);
+        
+        u8 tile_x = (x + SCX) % 8;
 
-    while(x < SCREEN_WIDTH) {
-        u8 line = (LY + SCY) % 8;
-        u8 tile_id = gbReadAt(gb, tile_map_start,0);
-        TileLine tl = gbGetTileLine(gb, tile_id, tile_data_select, line);
-        u16 y = LY + SCY;
-        if(y >= SCREEN_HEIGHT)
-            break;
-
-        gbRenderTileLine(gb, GetPaletteFromByte(BGP), tl, &x, y, x_offset);
-        tile_map_start++;
+        u8 color_val = (tl.data_2 >> (7-tile_x) & 1);
+        color_val <<= 1;
+        color_val   |= (tl.data_1 >> (7-tile_x) & 1);
+        gb->lcd_screen[LY][x] = bg_pal.array[color_val];
     }
 }
 
