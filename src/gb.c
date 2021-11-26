@@ -485,18 +485,26 @@ void gbInput(Gameboy *gb, SDL_KeyboardEvent *e, bool is_up) {
     
 }
 
-void gbRenderSpriteLine(Gameboy *gb, Palette p, TileLine line, u32 *x, u8 y, u8 x_offset) {
+void gbRenderSpriteLine(Gameboy *gb, Palette p, TileLine line, u32 *x, u8 y, bool is_x_flipped, bool priority) {
     
-    for(i32 i = x_offset; i < 8; i++) {
+    for(i32 i = 0; i < 8; i++) {
         if(*x >= SCREEN_WIDTH)
             *x = 0;
-        u8 color_val = (line.data_2 >> (7-i) & 1);
-        color_val <<= 1;
-        color_val |=  (line.data_1 >> (7-i) & 1);
-        
+        u8 color_val;
+        if(!is_x_flipped) {
+            color_val = (line.data_2 >> (7-i) & 1);
+            color_val <<= 1;
+            color_val |=  (line.data_1 >> (7-i) & 1);
+        } else {
+            color_val = (line.data_2 >> (i) & 1);
+            color_val <<= 1;
+            color_val |=  (line.data_1 >> (i) & 1);
+        }
         u8 paletted_color = p.array[color_val];
-        if(paletted_color != 0)
-            gb->lcd_screen[y][*x] = paletted_color;
+        if(color_val != 0) {
+            if(!priority || gb->lcd_screen[y][*x] < 1)            
+                gb->lcd_screen[y][*x] = paletted_color;
+        }
 
         (*x)++;
     }
@@ -591,6 +599,9 @@ void gbOAM(Gameboy *gb, u8 LCDC, u8 LY) {
             break;
         OAMSprite sprite = gbGetOAMSprite(gb, i);
         bool is_palette_1 = sprite.flags >> 4 & 1;
+        bool is_x_flipped = sprite.flags >> 5 & 1;
+        bool is_y_flipped = sprite.flags >> 6 & 1;
+        bool priority     = sprite.flags >> 7 & 1;
         Palette pal;
         if(is_palette_1) {
             pal = GetPaletteFromByte(OBP1);
@@ -601,12 +612,15 @@ void gbOAM(Gameboy *gb, u8 LCDC, u8 LY) {
             continue;
 
         sprite.y -= 0x10;
-        if(sprite.y <= LY && sprite.y + 8 >= LY) {
+        if(sprite.y <= LY && sprite.y + 8 > LY) {
             // Draw tile
             u8 line = LY - sprite.y;
+            if (is_y_flipped) {
+                line = 8 - line;
+            }
             TileLine tl = gbGetTileLine(gb, sprite.tile, 1, line);
-            u32 sx = sprite.x - 0x08;
-            gbRenderSpriteLine(gb, pal, tl, &sx, LY, 0);
+            u32 sx = sprite.x - 8;
+            gbRenderSpriteLine(gb, pal, tl, &sx, LY, is_x_flipped, priority);
             sprite_count++;
         } else {
             continue;
