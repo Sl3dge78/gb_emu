@@ -16,7 +16,8 @@ Run fairly smoothly on my machine. No optimization done at all.
 - Space : Pause/Resume execution
 
 ### Other
-- Press F5 to toggle debug mode
+- Press F1 to load a rom
+- Press F5 to toggle debug mode (slow!)
 - N/F7 : Run to next intruction
 - Space/F9 : Toggle execution
 - Click on a line in the disassembly to set a breakpoint or edit bp.txt next to the .exe and add your addresses
