@@ -136,7 +136,6 @@ void gbWriteAt(Gameboy *gb, u16 address, u8 value, bool log) {
         case (IO_DMA) : {
             gb->DMA_cycles_left = 0x9F; // DMA transfer
         } break;
-        case (IO_STAT) : return; // Prevent writing
         case (IO_IF)   : value |= 0xE0; break;
         case (IO_TAC)  : value |= 0xF8; break;
         case (IO_DIV)  : if(log) gb->timer = 0; break;
@@ -339,10 +338,9 @@ void gbInput(Gameboy *gb, SDL_KeyboardEvent *e, bool is_up) {
         switch(e->keysym.scancode) {
             case(SDL_SCANCODE_SPACE) : case(SDL_SCANCODE_F9) : {
                 gb->step_through = !gb->step_through; 
-                gb->cpu_clock = 0.0f; 
             } break;
             case(SDL_SCANCODE_F7) :
-            case(SDL_SCANCODE_N)  : gb->cycles_left = gb->cpu_clock == 0 ? 1 : gb->cpu_clock; break;
+            case(SDL_SCANCODE_N)  : gb->cycles_left = gb->cpu_clock <= 0 ? 1 : gb->cpu_clock; break;
             case(SDL_SCANCODE_R)  : gbReset(gb); SDL_Log("Reset", global_logverbose); break;
             case(SDL_SCANCODE_V)  : { 
                 global_logverbose = !global_logverbose; 
@@ -396,7 +394,7 @@ void gbRenderSpriteLine(Gameboy *gb, Palette p, TileLine line, u32 *x, u8 y, boo
     
     for(i32 i = 0; i < 8; i++) {
         if(*x >= SCREEN_WIDTH)
-            *x = 0;
+            return;
         u8 color_val;
         if(!is_x_flipped) {
             color_val = (line.data_2 >> (7-i) & 1);
@@ -460,7 +458,6 @@ void gbBackground(Gameboy *gb, u8 LCDC, u8 LY) {
 
     bool tile_data_select = LCDC >> 4 & 1;
     bool bg_tile_map_select = LCDC >> 3 & 1;
-    // Render scanline
     
     u16 tile_map_base_address = bg_tile_map_select ? 0x9C00 : 0x9800;
 
@@ -495,12 +492,15 @@ void gbWindow(Gameboy *gb, u8 LCDC, u8 LY) {
 void gbOAM(Gameboy *gb, u8 LCDC, u8 LY) {
     u16 x = 0;
     u8 sprite_count = 0;
+    bool sprite_size = (LCDC >> 2) & 1;
     u8 OBP0 = gbReadAt(gb, IO_OBP0 ,0);
     u8 OBP1 = gbReadAt(gb, IO_OBP1 ,0);
     for(u32 i = 0; i < 40; i++) {
         if(sprite_count >= 10) 
             break;
         OAMSprite sprite = gbGetOAMSprite(gb, i);
+       if(sprite.y < 0x10)
+            continue;
         bool is_palette_1 = sprite.flags >> 4 & 1;
         bool is_x_flipped = sprite.flags >> 5 & 1;
         bool is_y_flipped = sprite.flags >> 6 & 1;
@@ -511,9 +511,7 @@ void gbOAM(Gameboy *gb, u8 LCDC, u8 LY) {
         } else {
             pal = GetPaletteFromByte(OBP0);
         }
-        if(sprite.y < 0x10)
-            continue;
-
+        
         sprite.y -= 0x10;
         if(sprite.y <= LY && sprite.y + 8 > LY) {
             // Draw tile
@@ -525,6 +523,16 @@ void gbOAM(Gameboy *gb, u8 LCDC, u8 LY) {
             u32 sx = sprite.x - 8;
             gbRenderSpriteLine(gb, pal, tl, &sx, LY, is_x_flipped, priority);
             sprite_count++;
+        } else if(sprite_size == 1 && sprite.y + 8 <= LY && sprite.y + 16 > LY) {
+            u8 line = LY - sprite.y - 8;
+            if (is_y_flipped) {
+                line = 8 - line;
+            }
+            TileLine tl = gbGetTileLine(gb, sprite.tile+1, 1, line);
+            u32 sx = sprite.x - 8;
+            gbRenderSpriteLine(gb, pal, tl, &sx, LY, is_x_flipped, priority);
+            sprite_count++;
+
         } else {
             continue;
         }
@@ -540,19 +548,16 @@ void gbLCD(Gameboy *gb) {
         return;
     }
     
-    u8 STAT = gbReadAt(gb, IO_STAT ,0);
-    u8 WY   = gbReadAt(gb, IO_WY ,0);
-    u8 WX   = gbReadAt(gb, IO_WX ,0);
-    u8 LY   = gbReadAt(gb, IO_LY ,0);
-    u8 LYC  = gbReadAt(gb, IO_LYC ,0);
+    u8 STAT = gbReadAt(gb, IO_STAT, 0);
+    u8 WY   = gbReadAt(gb, IO_WY, 0);
+    u8 WX   = gbReadAt(gb, IO_WX, 0);
+    u8 LY   = gbReadAt(gb, IO_LY, 0);
+    u8 LYC  = gbReadAt(gb, IO_LYC, 0);
 
     if(LY < SCREEN_HEIGHT) {
         gbBackground(gb, LCDC, LY);
         gbWindow(gb, LCDC, LY);
         gbOAM(gb, LCDC, LY);
-        // Window
-       
-        // OAM
     }
     
     // End of Drawing
@@ -563,12 +568,14 @@ void gbLCD(Gameboy *gb) {
     gbWriteAt(gb, 0xFF44, LY, 0);
     
     // Update STAT register
-    STAT = (STAT & ~(1 << 2)) | ((LY == LYC) << 2 & (1 << 2)); // Coincidence flag
-    u8 mode = 0;
+    STAT = (STAT & 0b11111011) | (LY == LYC) << 2; // Coincidence flag
+    u8 mode = STAT & 0x3;
     if(LY >= 144 && LY <= 153) {
         mode = 1;
-    } else {
-        mode = 2;
+    } else {  // Faking hblanks
+        if(mode == 2) mode = 3;
+        else if(mode==3) mode = 0;
+        else mode = 2;
     }
     STAT = (STAT & 0b11111100) | mode; // Mode flag
     STAT |= 0x80;
@@ -598,7 +605,7 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
     
     if(!gb->step_through) {
         // Cap the amount of instructions for each frame 
-        gb->cycles_left = delta_time * gb->clock_speed * gb->clock_mul;
+        gb->cycles_left += delta_time * gb->clock_speed * gb->clock_mul;
         if(gb->cycles_left > 69905) gb->cycles_left = 69905; // Clockspeed * 1 / 60
     }
     
@@ -606,17 +613,19 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
     
     while(gb->cycles_left >= 0) {
         if(gb->cpu_clock <= 0) {
-            
             if(!gb->halted) 
                 gbExecute(gb);           
             for(u32 i = 0; i < gb->breakpoint_count; i ++) {
                 if(gb->pc == gb->breakpoints[i]) {
                     gb->step_through = true;
+                    gb->cycles_left = 0;
                 }
             }
-            if(gb->step_through) {
+            
+            if (gb->step_through) {
                 gb->cycles_left = 0;
-            } 
+            }
+
         } 
         while(gb->ppu_clock <= 0)
             gbLCD(gb);
