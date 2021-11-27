@@ -50,6 +50,6 @@ void DrawConsole(SDL_Renderer *renderer, Console *console, u32 x, u32 bottom) {
     i32 w;
     TTF_SizeText(global_font, "X", &w, 0);
     
-    const SDL_Rect rect = {x, top - line_height - 10, w * 128, bottom - top + line_height + line_height};
+    const SDL_Rect rect = {x, top - line_height - 10, w * 64, bottom - top + line_height + line_height};
     SDL_RenderDrawRect(renderer, &rect);
 }

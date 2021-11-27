@@ -451,24 +451,13 @@ inline TileLine gbGetTileLine(Gameboy *gb, u8 tile_offset, bool mode, u8 line) {
     return result;
 }
 
-void gbBackground(Gameboy *gb, u8 LCDC, u8 LY) {
-    u8 SCY  = gbReadAt(gb, IO_SCY ,0);
-    u8 SCX  = gbReadAt(gb, IO_SCX ,0);
-    u8 BGP  = gbReadAt(gb, IO_BGP ,0);
-
-    bool tile_data_select = LCDC >> 4 & 1;
-    bool bg_tile_map_select = LCDC >> 3 & 1;
-    
-    u16 tile_map_base_address = bg_tile_map_select ? 0x9C00 : 0x9800;
-
-    u8 map_line  = ((LY + SCY) / 8) % 32;
-    u8 tile_line = (LY + SCY) % 8;
+void gbDrawBackgroundLine(Gameboy *gb, u8 LY, u8 SCX, u8 map_line, u8 tile_line, u16 base_address, bool tile_data_select) {
     
     Palette bg_pal = GetPaletteFromByte(gbReadAt(gb, IO_BGP, 0));
 
     for(u16 x = 0; x < SCREEN_WIDTH; x++) {
         u8 map_x = ((SCX + (u8)x) / 8) % 32;
-        u16 address = (tile_map_base_address + map_x) + (map_line * 32);
+        u16 address = (base_address + map_x) + (map_line * 32);
         u8 tile_id = gbReadAt(gb, address, 0);
         TileLine tl = gbGetTileLine(gb, tile_id, tile_data_select, tile_line);
         
@@ -479,13 +468,43 @@ void gbBackground(Gameboy *gb, u8 LCDC, u8 LY) {
         color_val   |= (tl.data_1 >> (7-tile_x) & 1);
         gb->lcd_screen[LY][x] = bg_pal.array[color_val];
     }
+
+}
+
+void gbBackground(Gameboy *gb, u8 LCDC, u8 LY) {
+    u8 SCY  = gbReadAt(gb, IO_SCY ,0);
+    u8 SCX  = gbReadAt(gb, IO_SCX ,0);
+    u8 BGP  = gbReadAt(gb, IO_BGP ,0);
+
+    bool tile_data_select = LCDC >> 4 & 1;
+    bool bg_tile_map_select = LCDC >> 3 & 1;
+    u16 tile_map_base_address = bg_tile_map_select ? 0x9C00 : 0x9800;
+
+    u8 map_line  = ((LY + SCY) / 8) % 32;
+    u8 tile_line = (LY + SCY) % 8;
+
+    gbDrawBackgroundLine(gb, LY, SCX, map_line, tile_line, tile_map_base_address, tile_data_select);
 }
 
 void gbWindow(Gameboy *gb, u8 LCDC, u8 LY) {
-    bool window_tile_data_select = LCDC >> 6 & 1;
     bool window_display = LCDC >> 5 & 1;
     if(window_display) {
+        u8 WY   = gbReadAt(gb, IO_WY, 0);
+        u8 WX   = gbReadAt(gb, IO_WX, 0) - 8;
+            
+        if(LY < WY)
+            return;
 
+        i8 map_line  = ((LY - WY) / 8);
+        if (map_line > 32 || map_line < 0) 
+            return;
+         u8 tile_line = (LY - WY) % 8;
+      
+        bool tile_data_select = LCDC >> 4 & 1;
+        bool window_tile_data_select = LCDC >> 6 & 1;
+        u16 tile_map_base_address = window_tile_data_select ? 0x9C00 : 0x9800;
+        
+        gbDrawBackgroundLine(gb, LY, WX, map_line, tile_line, tile_map_base_address, tile_data_select);
     }
 }
 
@@ -549,8 +568,6 @@ void gbLCD(Gameboy *gb) {
     }
     
     u8 STAT = gbReadAt(gb, IO_STAT, 0);
-    u8 WY   = gbReadAt(gb, IO_WY, 0);
-    u8 WX   = gbReadAt(gb, IO_WX, 0);
     u8 LY   = gbReadAt(gb, IO_LY, 0);
     u8 LYC  = gbReadAt(gb, IO_LYC, 0);
 
@@ -994,8 +1011,6 @@ void gbDrawDebug(Gameboy *gb, SDL_Rect rect, Console *console, SDL_Renderer *ren
                 }
                 y+= 8;
             }
-            
-            RenderLine(renderer, x_section_start, &y, " ");
             tile_addr = 0x00;
             x = x_section_start;
             for(u32 j = 0; j < 0x8; j ++){ // Tiles vert
@@ -1020,7 +1035,6 @@ void gbDrawDebug(Gameboy *gb, SDL_Rect rect, Console *console, SDL_Renderer *ren
             }
             y_section = y;
         }
-        RenderLine(renderer, x_section_start, &y_section, " ");
         {
             RenderLine(renderer, x_section_start, &y_section, "MAP 1");
             u8 LCDC = gbReadAt(gb, 0xFF40, 0);
@@ -1043,8 +1057,34 @@ void gbDrawDebug(Gameboy *gb, SDL_Rect rect, Console *console, SDL_Renderer *ren
                     }
                 }
             }
+            y_section += 32 * 8;
         }
         
+        {
+            RenderLine(renderer, x_section_start, &y_section, "MAP 2");
+            u8 LCDC = gbReadAt(gb, 0xFF40, 0);
+            bool tile_data_select = LCDC >> 4 & 1;
+            u16 base_addr = 0x9C00;
+            for(u32 y = 0; y < 32; y++) {
+                for(u32 x = 0; x < 32; x++) {
+                    u16 addr = base_addr + x + y * 32;
+                    u8 tile_id = gbReadAt(gb, addr, 0);
+                    for(u16 line = 0; line < 8; line++) {
+                        TileLine tl = gbGetTileLine(gb, tile_id, tile_data_select, line);
+                        for(i32 row = 0; row < 8; row++) {
+                            u8 pixel = (tl.data_2 >> (7 - row) & 1);
+                            pixel <<= 1;
+                            pixel |= (tl.data_1 >> (7 - row) & 1);
+                            Color color = palette[pixel];
+                            SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 255); 
+                            SDL_RenderDrawPoint(renderer, x_section + x * 8 + row, y_section + y * 8 + line);
+                        }
+                    }
+                }
+            }
+        }
+
+
         // New column
         x_section += 140;
         x_section_start = x_section;
