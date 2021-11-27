@@ -1,5 +1,5 @@
 Just another GameBoy emulator made for fun and learning. Features a full memory map view of the key places, breakpoints, and dissassembly.
-Run fairly smoothly on my machine. No optimization done at all. 
+Runs fairly smoothly on my machine. No optimization done at all. 
 
 # Use 
 - Press F1 to open a rom
