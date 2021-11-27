@@ -22,6 +22,28 @@ void __assert(bool value) {
     }
 }
 
+void OpenRom(Gameboy *gb) {
+    OPENFILENAME ofn = {0};
+    ofn.lStructSize = sizeof(OPENFILENAME);
+    ofn.lpstrTitle  = "Open Rom";
+    ofn.lpstrFile = calloc(256, sizeof(char));
+    ofn.nMaxFile  = 256;
+    char *cwd = calloc(256, sizeof(char));
+    GetCurrentDirectory(256, cwd);
+    ofn.lpstrInitialDir = cwd; 
+    if (! GetOpenFileName(&ofn)) {
+        SDL_LogError(0, "Error opening dialog");
+        goto cleanup;
+    }
+    
+    gbLoadRom(gb, ofn.lpstrFile);
+    gbReset(gb);
+
+cleanup:
+    free(cwd);
+    free(ofn.lpstrFile);
+}
+
 i32 main(i32 argc, char *argv[]) {
     
     SDL_Init(SDL_INIT_EVERYTHING);
@@ -62,6 +84,9 @@ i32 main(i32 argc, char *argv[]) {
                     else 
                         SDL_SetWindowSize(window, SCREEN_WIDTH, SCREEN_HEIGHT);
                     
+               } break;
+               case (SDL_SCANCODE_F1) : {
+                   OpenRom(&gb); 
                } break;
                default : gbInput(&gb, &event.key, 0); break;
                }

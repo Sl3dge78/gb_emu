@@ -646,10 +646,9 @@ void gbExecute(Gameboy *gb) {
             gb->pc++;
             gbWrite(gb, gb->hl, gbReadAt(gb, gb->pc++, 0));
         } break;
-        case (0x37): {
+        case (0x37): { // SCF
             gb->cpu_clock += 4;
             gb->pc++;
-            gbWrite(gb, IO_SCY, 1);
             gbSetFlags(gb, -1, 0, 0, 1);
         } break;
         case (0x38): {

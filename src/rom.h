@@ -9,7 +9,9 @@ const u16 ROM_RAM_END    = 0xBFFF;
 
 const u8 supported_cartridges[] = {
     0x00,
-    0x01
+    0x01,
+    0x02,
+    0x03,
 };
 
 

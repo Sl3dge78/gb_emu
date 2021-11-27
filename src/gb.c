@@ -122,7 +122,7 @@ void gbBreakpoint(Gameboy *gb) {
 void gbWriteAt(Gameboy *gb, u16 address, u8 value, bool log) {
     if(log)
         gb->last_write = address;
-    
+   
     if(address >= MEM_ROM_START && address <= MEM_ROM_END) {
         RomWrite(&gb->rom, address, value);
         return;
@@ -468,7 +468,6 @@ void gbDrawBackgroundLine(Gameboy *gb, u8 LY, u8 SCX, u8 map_line, u8 tile_line,
         color_val   |= (tl.data_1 >> (7-tile_x) & 1);
         gb->lcd_screen[LY][x] = bg_pal.array[color_val];
     }
-
 }
 
 void gbBackground(Gameboy *gb, u8 LCDC, u8 LY) {
@@ -498,7 +497,7 @@ void gbWindow(Gameboy *gb, u8 LCDC, u8 LY) {
         i8 map_line  = ((LY - WY) / 8);
         if (map_line > 32 || map_line < 0) 
             return;
-         u8 tile_line = (LY - WY) % 8;
+        u8 tile_line = (LY - WY) % 8;
       
         bool tile_data_select = LCDC >> 4 & 1;
         bool window_tile_data_select = LCDC >> 6 & 1;
