@@ -716,7 +716,6 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
                     gbWriteAt(gb, --gb->sp, gb->pc >> 8 & 0xFF, 0);
                     gbWriteAt(gb, --gb->sp, gb->pc & 0xFF, 0);
                     gb->pc = 0x40 + (i * 0x8);
-                    SDL_Log("Interrupt triggered %04X", gb->pc);
                 }
             }
         }

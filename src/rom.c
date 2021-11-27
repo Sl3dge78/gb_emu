@@ -7,7 +7,44 @@ bool RomCheckForCartridgeCompatibility(u8 cartridge_type) {
     return false;
 }
 
+void RomGetSavePath(Rom *rom, char *save_path, u32 str_size) {
+    strncpy(save_path, rom->path, 256);
+    char *dot = strrchr(save_path, '.');
+    if(dot) {
+        strncpy(dot, ".sav", 4);
+    }
+}
+
+void RomSaveRam(Rom *rom) {
+    char save_path[256];
+    RomGetSavePath(rom, save_path, 256);
+    FILE *ram_file = fopen(save_path, "wb");
+    if(ram_file) {
+        fwrite(rom->ram_data, sizeof(u8), rom->ram_size, ram_file);
+        fclose(ram_file);
+        SDL_Log("Saved at at %s", save_path);
+    }
+}
+
+void RomLoadRam(Rom *rom) {
+    char save_path[256];
+    RomGetSavePath(rom, save_path, 256);
+    FILE *ram_file = fopen(save_path, "rb");
+    if(ram_file) {
+        fseek(ram_file, 0, SEEK_END);
+        u32 size = ftell(ram_file);
+        rewind(ram_file);
+        if(size <= rom->ram_size) {
+            fread(rom->ram_data, 1, rom->ram_size, ram_file);
+        }
+        fclose(ram_file);
+    } else {
+        SDL_Log("No save data found at %s", save_path);
+    }
+}
+
 void RomLoad(Rom *rom, const char *path) {
+    rom->path = path;
     FILE *rom_file = fopen(path, "rb");
     
     fseek(rom_file, 0, SEEK_END);
@@ -39,6 +76,8 @@ void RomLoad(Rom *rom, const char *path) {
         rom->ram_data = calloc(1, rom->ram_size);
     SDL_Log("Ram size is %d", rom->ram_size);
     
+    // Load save if any
+    RomLoadRam(rom);
     RomReset(rom);
 }
 
@@ -74,6 +113,10 @@ void RomWrite(Rom *rom, u16 address, u8 value) {
         case (0x2):
         case (0x3): { // MBC 1
             if(address >= 0x0000 && address <= 0x1FFF) { // RAM Enable
+                if(value == 0) { // We're diabling Ram so save it to file
+                    RomSaveRam(rom);
+                    SDL_Log("Saving ram");
+                }
                 // @todo Not simulated 
                 return;
             } else if (address >= 0x2000 && address <= 0x2FFF) { // ROM bank

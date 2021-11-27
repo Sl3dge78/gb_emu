@@ -16,7 +16,7 @@ const u8 supported_cartridges[] = {
 
 
 typedef struct Rom {
-    
+    const char *path;
     u8 type;
 
     u8 *rom_data;
