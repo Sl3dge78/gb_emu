@@ -5,10 +5,10 @@ Run fairly smoothly on my machine. No optimization done at all.
 - Press F1 to open a rom
 
 ### Input
-- A : A
-- B : S
+- A : S
+- B : Q
 - Start : X
-- Select : W
+- Select : Z
 - Up : Up Arrow
 - Down : Down Arrow
 - Left : Left Arrow
