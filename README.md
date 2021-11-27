@@ -2,7 +2,7 @@ Just another GameBoy emulator made for fun and learning. The code base is pretty
 Run fairly smoothly on my machine. No optimization done at all. 
 
 # Use 
-- Add your rom next to the exe and name it rom.gb   
+- Press F1 to open a rom
 
 ### Input
 - A : A

@@ -275,6 +275,7 @@ void gbInterrupt(Gameboy *gb, u8 id) {
 
 void gbLoadRom(Gameboy *gb, const char *path) {
     RomLoad(&gb->rom, path);
+    gb->rom_loaded = true;
 }
 
 void gbReset(Gameboy *gb) {
@@ -640,7 +641,7 @@ void gbLCD(Gameboy *gb) {
 }
 
 void gbLoop(Gameboy *gb, f32 delta_time) {
-    
+
     if(!gb->step_through) {
         // Cap the amount of instructions for each frame 
         gb->cycles_left += delta_time * gb->clock_speed * gb->clock_mul;

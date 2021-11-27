@@ -173,6 +173,7 @@ typedef struct Gameboy {
     u8 keys_buttons;
   
     // Internals
+    bool rom_loaded;
     i32 cpu_clock;
     i32 ppu_clock;
     i32 cycles_left;
