@@ -554,29 +554,53 @@ void gbLCD(Gameboy *gb) {
     u8 LY   = gbReadAt(gb, IO_LY, 0);
     u8 LYC  = gbReadAt(gb, IO_LYC, 0);
 
-    if(LY < SCREEN_HEIGHT) {
-        gbBackground(gb, LCDC, LY);
-        gbWindow(gb, LCDC, LY);
-        gbOAM(gb, LCDC, LY);
+    u8 mode = STAT & 0x3;
+   
+    switch(mode) {
+        case 0: { // H blank, draw the line!
+            gbBackground(gb, LCDC, LY);
+            gbWindow(gb, LCDC, LY);
+            gbOAM(gb, LCDC, LY);
+            LY++;
+            if(LY == 154) {
+                LY = 0;
+            }
+            gbWriteAt(gb, 0xFF44, LY, 0);
+
+            if(LY >= 144 && LY <= 153) { // We're in vblank
+                mode = 1;
+            } else { // Go the start of the sequence for the next line
+                mode = 2;
+            }
+            gb->ppu_clock += 208;
+        } break;
+        case 1: { // VBlank
+            LY++;
+            if(LY == 154) {
+                LY = 0;
+            }
+            gbWriteAt(gb, 0xFF44, LY, 0);
+
+            if(LY >= 144 && LY <= 153) { // We're in vblank
+                mode = 1;
+            } else { // Go the start of the sequence for the next line
+                mode = 2;
+            }
+            gb->ppu_clock += 456;
+        } break;
+        case 2: { // Scanning oam
+            mode = 3;
+            gb->ppu_clock += 80;
+        } break;
+        case 3: { // Reading oam
+            mode = 0;
+            gb->ppu_clock += 168;
+        } break;
     }
     
-    // End of Drawing
-    LY++;
-    if(LY == 154) {
-        LY = 0;
-    }
-    gbWriteAt(gb, 0xFF44, LY, 0);
-    
+
     // Update STAT register
     STAT = (STAT & 0b11111011) | (LY == LYC) << 2; // Coincidence flag
-    u8 mode = STAT & 0x3;
-    if(LY >= 144 && LY <= 153) {
-        mode = 1;
-    } else {  // Faking hblanks
-        if(mode == 2) mode = 3;
-        else if(mode==3) mode = 0;
-        else mode = 2;
-    }
     STAT = (STAT & 0b11111100) | mode; // Mode flag
     STAT |= 0x80;
     gbWriteAt(gb, IO_STAT, STAT, 0);
@@ -597,8 +621,6 @@ void gbLCD(Gameboy *gb) {
     if(STAT >> 3 & 1) { // H-Blank interrupt
         // TODO(Guigui): Trigger 
     }
-    
-    gb->ppu_clock += 456;
 }
 
 void gbLoop(Gameboy *gb, f32 delta_time) {
