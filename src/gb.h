@@ -173,15 +173,15 @@ typedef struct Gameboy {
     u8 keys_buttons;
     
     // Audio
-    f32 audio_time;
     u32 sample_rate;
     SDL_AudioDeviceID audio_device;
     u32 audio_gain;
 
-    i8 channel2_volume;
-    f32 channel2_length;
-    f32 channel2_env_counter;
-    bool channel2_enveloppe;
+    AudioEnveloppe channel1_enveloppe;
+    f32 chan1_time;
+
+    AudioEnveloppe channel2_enveloppe;
+    f32 chan2_time;
 
     // Internals
     bool rom_loaded;

@@ -146,16 +146,34 @@ void gbWriteAt(Gameboy *gb, u16 address, u8 value, bool external) {
                 value &= 0x80;
             }
         } break;
+        case (IO_NR11) : {
+            u8 length = (value & 0b00011111);
+            gb->channel1_enveloppe.length = (64 - length) * (1.0f/256.0f);
+        } break;
+        case (IO_NR12) : {
+            gb->channel1_enveloppe.volume = (value >> 4) & 0x0F;
+        } break;
+        case (IO_NR14) : {
+            bool is_playing = (value & 0x80) != 0;
+            if(is_playing) {
+                OnChannelInitSet(gb, &gb->channel1_enveloppe);
+                gb->mem[IO_NR52] |= 1;
+            }
+        } break;
+
         case (IO_NR21) : {
             u8 length = (value & 0b00011111);
-            gb->channel2_length = (64 - length) * (1.0f/256.0f);
+            gb->channel2_enveloppe.length = (64 - length) * (1.0f/256.0f);
         } break;
         case (IO_NR22) : {
-            gb->channel2_volume = (value >> 4) & 0x0F;
+            gb->channel2_enveloppe.volume = (value >> 4) & 0x0F;
         } break;
         case (IO_NR24) : {
             bool is_playing = (value & 0x80) != 0;
-            if(is_playing) OnChannel2InitSet(gb);
+            if(is_playing) {
+                OnChannelInitSet(gb, &gb->channel2_enveloppe);
+                gb->mem[IO_NR52] |= (1 << 1);
+            }
         } break;
 
     }
