@@ -117,7 +117,6 @@ void RomWrite(Rom *rom, u16 address, u8 value) {
                     RomSaveRam(rom);
                     SDL_Log("Saving ram");
                 }
-                // @todo Not simulated 
                 return;
             } else if (address >= 0x2000 && address <= 0x2FFF) { // ROM bank
                 rom->rom_bank = value & 0b00011111;

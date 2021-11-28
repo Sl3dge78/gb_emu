@@ -179,10 +179,14 @@ typedef struct Gameboy {
 
     AudioEnveloppe channel1_enveloppe;
     f32 chan1_time;
+    u16 chan1_tone;
+    f32 sweep_timer;
+    u8 sweep_period;
 
     AudioEnveloppe channel2_enveloppe;
     f32 chan2_time;
 
+    AudioEnveloppe channel4_enveloppe;
     // Internals
     bool rom_loaded;
     i32 cpu_clock;

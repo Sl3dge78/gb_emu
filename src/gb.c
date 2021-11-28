@@ -146,33 +146,32 @@ void gbWriteAt(Gameboy *gb, u16 address, u8 value, bool external) {
                 value &= 0x80;
             }
         } break;
-        case (IO_NR11) : {
-            u8 length = (value & 0b00011111);
-            gb->channel1_enveloppe.length = (64 - length) * (1.0f/256.0f);
-        } break;
-        case (IO_NR12) : {
-            gb->channel1_enveloppe.volume = (value >> 4) & 0x0F;
-        } break;
+
         case (IO_NR14) : {
             bool is_playing = (value & 0x80) != 0;
             if(is_playing) {
-                OnChannelInitSet(gb, &gb->channel1_enveloppe);
-                gb->mem[IO_NR52] |= 1;
+                EnveloppeInit(gb, &gb->channel1_enveloppe, 0);
+
+                gb->chan1_tone = gbReadAt(gb, IO_NR13, 0);
+                gb->chan1_tone |= (value & 0x07) << 8;
+                gb->sweep_timer = (1.0f/128.0f);
+                u8 NR10 = gbReadAt(gb, IO_NR10, 0);
+                u8 time = (NR10 >> 4) & 0b111;
+                gb->sweep_period = time == 0 ? 8 : time;
             }
         } break;
-
-        case (IO_NR21) : {
-            u8 length = (value & 0b00011111);
-            gb->channel2_enveloppe.length = (64 - length) * (1.0f/256.0f);
-        } break;
-        case (IO_NR22) : {
-            gb->channel2_enveloppe.volume = (value >> 4) & 0x0F;
-        } break;
+    
         case (IO_NR24) : {
             bool is_playing = (value & 0x80) != 0;
             if(is_playing) {
-                OnChannelInitSet(gb, &gb->channel2_enveloppe);
-                gb->mem[IO_NR52] |= (1 << 1);
+                EnveloppeInit(gb, &gb->channel2_enveloppe, 1);
+            }
+        } break;
+        // Channel 4
+        case (IO_NR44) : {
+            bool is_playing = (value & 0x80) != 0;
+            if(is_playing) {
+                EnveloppeInit(gb, &gb->channel4_enveloppe, 3);
             }
         } break;
 
@@ -252,7 +251,7 @@ void gbInit(Gameboy *gb) {
     gb->ppu_clock = 1;
     gb->cycles_left = 0;
     gb->running = true;
-    gb->step_through = 1;
+    gb->step_through = 0;
     gb->mem = calloc(1, MEM_SIZE);
     gb->keys_dpad = 0xFF;
     gb->keys_buttons = 0xFF;

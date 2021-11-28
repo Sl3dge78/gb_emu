@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h> // For rng
 #include <string.h>
 #include <windows.h>
 
@@ -62,7 +63,8 @@ i32 main(i32 argc, char *argv[]) {
     
     gbInit(&gb);
     //gbTest(&gb);
-    gbLoadRom(&gb, "resources/tetris_rom.gb");
+    //gbLoadRom(&gb, "resources/rom.gb");
+    gbLoadRom(&gb, "resources/zelda_rom.gb");
     
     f32 delta_time = 0;
     u64 frame_start = SDL_GetPerformanceCounter();
