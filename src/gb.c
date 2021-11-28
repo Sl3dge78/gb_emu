@@ -150,6 +150,9 @@ void gbWriteAt(Gameboy *gb, u16 address, u8 value, bool external) {
             u8 length = (value & 0b00011111);
             gb->channel2_length = (64 - length) * (1.0f/256.0f);
         } break;
+        case (IO_NR22) : {
+            gb->channel2_volume = (value >> 4) & 0x0F;
+        } break;
         case (IO_NR24) : {
             bool is_playing = (value & 0x80) != 0;
             if(is_playing) OnChannel2InitSet(gb);

@@ -156,7 +156,9 @@ u8 RomRead(Rom *rom, u16 address) {
             u32 offset = rom->ram_bank * 0x2000;
             u32 relative_address = address - ROM_RAM_START;
             return rom->ram_data[relative_address + offset];
-        }       
+        } else {
+            return 0;
+        }
     }
     assert(0);
     return 0;

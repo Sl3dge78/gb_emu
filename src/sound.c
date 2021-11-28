@@ -39,13 +39,7 @@ f32 GetSquareDuty(u8 byte) {
 
 void Channel2Audio(i16 *stream, i32 len, Gameboy *gb) {
     u8 NR21   = gbReadAt(gb, IO_NR21, 0);
-    u8 length = (NR21 & 0x3F); //@TODO
     u8 duty   = (NR21 & 0xC0) >> 6;
-    
-    u8 NR22 = gbReadAt(gb, IO_NR22, 0);
-    u8 volume    = (NR22 & 0xF0) >> 4; 
-    u8 direction = (NR22 & 0x08) >> 3; //@TODO
-    u8 env_num   = (NR22 & 0x07);      //@TODO
 
     u8 NR24   = gbReadAt(gb, IO_NR24, 0);
     u16 pitch = gbReadAt(gb, IO_NR23, 0);
@@ -75,12 +69,14 @@ void Channel2Update(Gameboy *gb, f32 delta_time) {
             NR52 = (NR52 & ~(0b10)); // Toggle byte 2 off
             gb->mem[IO_NR52] = NR52;
         }
+    } else {
+        gb->channel2_enveloppe = false;
     }
     // Enveloppe
    if (gb->channel2_enveloppe){ 
         gb->channel2_env_counter -= delta_time;
-
-       if(gb->channel2_env_counter <= 0){
+        
+        if(gb->channel2_env_counter <= 0){
             u8 NR22 = gbReadAt(gb, IO_NR22, 0);
             u8 direction = (NR22 & 0x08) >> 3; 
             u8 env_num   = (NR22 & 0x07);      
