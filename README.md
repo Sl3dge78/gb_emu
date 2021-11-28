@@ -31,12 +31,12 @@ Runs fairly smoothly on my machine. No optimization done at all.
 
 # Roadmap
 
-- [ ] More MBC Types
 - [ ] Audio
     - [X] Channel 1
     - [X] Channel 2
     - [ ] Channel 3
     - [ ] Channel 4
+- [ ] More MBC Types
 - [ ] GBC modes
 
 ### Blargg's Tests Progress
@@ -44,23 +44,6 @@ Runs fairly smoothly on my machine. No optimization done at all.
  - [ ] Instruction Timing
  - [ ] Memory Timing
  - [ ] DMG Soung
-
-### MoonEye Tests 
- - [ ] Acceptance
-    - [ ] Timer
-        - [X] div_write
-        - [ ] rapid_toggle
-        - [X] tim00
-        - [ ] tim00_div_trigger
-        - [X] tim01
-        - [ ] tim01_div_trigger
-        - [X] tim10
-        - [ ] tim10_div_trigger
-        - [X] tim11
-        - [ ] tim11_div_trigger
-        - [ ] tima_reload
-        - [ ] time_write_reloading
-        - [ ] tma_write_reloading
 
 # Screenshots
 ![1](https://github.com/Sl3dge78/gb_emu/blob/main/screenshots/1.png?raw=true)  
