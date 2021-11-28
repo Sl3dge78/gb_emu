@@ -29,8 +29,6 @@
 #define IO_TMA  0xFF06
 #define IO_TAC  0xFF07
 
-
-
 #define IO_LCDC   0xFF40
 #define IO_STAT   0xFF41
 #define IO_SCY    0xFF42
@@ -178,6 +176,12 @@ typedef struct Gameboy {
     f32 audio_time;
     u32 sample_rate;
     SDL_AudioDeviceID audio_device;
+    u32 audio_gain;
+
+    i8 channel2_volume;
+    f32 channel2_length;
+    f32 channel2_env_counter;
+    bool channel2_enveloppe;
 
     // Internals
     bool rom_loaded;

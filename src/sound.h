@@ -11,4 +11,5 @@
 
 typedef struct Gameboy Gameboy;
 void gbInitAudio (Gameboy *gb);
-
+void gbAudioLoop(Gameboy *gb, f32 delta_time);
+void OnChannel2InitSet(Gameboy *gb);

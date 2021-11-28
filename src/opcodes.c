@@ -269,6 +269,97 @@ Opcode OPCODE_DESC_TABLE[0X100] = {
 internal void gbPrefixCB(Gameboy *gb); 
 internal void gbInstructionLD(Gameboy *gb, u8 op_code);
 
+void gbSetFlags(Gameboy *gb, i32 Z, i32 N, i32 H, i32 C) {
+    
+    if(Z != -1)
+        gb->f = (gb->f & ~Z_FLAG) | (Z << 7 & Z_FLAG);
+    if(N != -1)
+        gb->f = (gb->f & ~N_FLAG) | (N << 6 & N_FLAG);
+    if(H != -1)
+        gb->f = (gb->f & ~H_FLAG) | (H << 5 & H_FLAG);
+    if(C != -1)
+        gb->f = (gb->f & ~C_FLAG) | (C << 4 & C_FLAG);
+    
+}
+
+void gbADD(Gameboy *gb, u8 operand, u8 carry) {
+    u16 half_a = gb->a & 0xF;
+    half_a += operand & 0xF;
+    u16 result = gb->a + operand;
+    if((gb->f & C_FLAG) != 0 && carry) {
+        result += carry;
+        half_a += carry;
+    }
+    
+    gbSetFlags(gb, (result & 0xFF) == 0, 0, half_a > 0xF, result > 0xFF);
+    gb->a = result & 0xFF;
+}
+
+void gbSUB(Gameboy *gb, u8 operand, u8 carry) {
+    u16 half_a = gb->a & 0xF;
+    half_a -= operand & 0xF;
+    u16 result = gb->a - operand;
+    if((gb->f & C_FLAG) != 0 && carry) {
+        result -= carry;
+        half_a -= carry;
+    }
+    gbSetFlags(gb, (result & 0xFF) == 0, 1, half_a > 0xF, result > 0xFF);
+    gb->a = result & 0xFF;
+}
+
+void gbAND(Gameboy *gb, u8 operand) {
+    gb->a = operand & gb->a;
+    gbSetFlags(gb, gb->a == 0, 0, 1, 0);
+}
+
+void gbXOR(Gameboy *gb, u8 operand) {
+    gb->a = operand ^ gb->a;
+    gbSetFlags(gb, gb->a == 0, 0, 0, 0);
+}
+
+void gbOR(Gameboy *gb, u8 operand) {
+    gb->a = operand | gb->a;
+    gbSetFlags(gb, gb->a == 0, 0, 0, 0);
+}
+
+void gbCP(Gameboy *gb, u8 operand) {
+    i16 half_a = gb->a & 0xF;
+    
+    i16 result = gb->a - operand;
+    half_a -= operand & 0xF;
+    
+    gbSetFlags(gb, result == 0, 1, half_a < 0, result < 0);
+    
+}
+
+u8 gbGetFromByteCode(Gameboy *gb, u8 id) {
+    switch(id) {
+        case 0 : return gb->b;
+        case 1 : return gb->c;
+        case 2 : return gb->d;
+        case 3 : return gb->e;
+        case 4 : return gb->h;
+        case 5 : return gb->l;
+        case 6 : return gbRead(gb, gb->hl);
+        case 7 : return gb->a;
+        default: assert(0); return 0;
+    }
+}
+
+void gbSetFromByteCode(Gameboy *gb, u8 id, u8 value) {
+    switch(id) {
+        case 0 : gb->b = value; return;
+        case 1 : gb->c = value; return;
+        case 2 : gb->d = value; return;
+        case 3 : gb->e = value; return;
+        case 4 : gb->h = value; return;
+        case 5 : gb->l = value; return;
+        case 6 : gbWrite(gb, gb->hl, value); return;
+        case 7 : gb->a = value; return;
+        default: assert(0); return;
+    }
+}
+
 void gbExecute(Gameboy *gb) {
     
     u8 op_code = gbReadAt(gb, gb->pc, 0);
