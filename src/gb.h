@@ -29,6 +29,8 @@
 #define IO_TMA  0xFF06
 #define IO_TAC  0xFF07
 
+
+
 #define IO_LCDC   0xFF40
 #define IO_STAT   0xFF41
 #define IO_SCY    0xFF42
@@ -171,7 +173,12 @@ typedef struct Gameboy {
     
     u8 keys_dpad;
     u8 keys_buttons;
-  
+    
+    // Audio
+    f32 audio_time;
+    u32 sample_rate;
+    SDL_AudioDeviceID audio_device;
+
     // Internals
     bool rom_loaded;
     i32 cpu_clock;

@@ -139,6 +139,7 @@ void gbWriteAt(Gameboy *gb, u16 address, u8 value, bool log) {
         case (IO_IF)   : value |= 0xE0; break;
         case (IO_TAC)  : value |= 0xF8; break;
         case (IO_DIV)  : if(log) gb->timer = 0; break;
+        case (IO_NR52) : SDL_PauseAudioDevice(gb->audio_device, !((value >> 7) & 1)); value &= 0x80; break;
     }
     
     if(address >= MEM_MIRROR0_START && address <= MEM_MIRROR1_END) {
@@ -296,6 +297,7 @@ void gbReset(Gameboy *gb) {
     gbWrite(gb, IO_IE, 0x00); 
     gbWrite(gb, IO_TAC, 0x00); 
     gbWrite(gb, 0x2000, 0x01); // Select rom bank 1
+
     RomReset(&gb->rom);
 }
 
@@ -329,8 +331,8 @@ void gbInit(Gameboy *gb) {
         fclose(file);
     } 
    
+    gbInitAudio(gb);
     gb->rom = (Rom){0};
-
     gbReset(gb);
 }
 
@@ -887,6 +889,8 @@ void gbDrawDebug(Gameboy *gb, SDL_Rect rect, Console *console, SDL_Renderer *ren
         RenderLine(renderer, x, &y, "PAD        %u%u%u%u%u%u%u%u", BINARY_FMT(gb->keys_dpad));
         RenderLine(renderer, x, &y, "ROM        %02X", gb->rom.rom_bank);
         RenderLine(renderer, x, &y, "RAM        %02X", gb->rom.ram_bank);
+        RenderLine(renderer, x, &y, "----------------");
+        RenderLine(renderer, x, &y, "NR52(FF26) %u%u%u%u%u%u%u%u", BINARY_FMT(gbReadAt(gb, IO_NR52, 0)));
         
     }
     {

@@ -6,14 +6,16 @@
 #include <SDL/SDL.h>
 #include <SDL/SDL_ttf.h>
 
-#include "utils.h"
+#include "utils/sTypes.h"
 #include "rom.h"
+#include "sound.h"
 #include "gb.h"
 
 #include "console.c"
 #include "opcodes.c"
 #include "gb.c"
 #include "rom.c"
+#include "sound.c"
 
 void __assert(bool value) {
     if (!value){ 
@@ -50,7 +52,7 @@ i32 main(i32 argc, char *argv[]) {
     TTF_Init();
     SDL_Window *window = SDL_CreateWindow("Gameboy", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-    
+   
     Console console = {0};
     SDL_LogSetOutputFunction(&SDLLogConsole, &console);
     SDL_LogSetPriority(LOG_OPCODE, global_logverbose ? SDL_LOG_PRIORITY_VERBOSE : SDL_LOG_PRIORITY_INFO);
@@ -60,7 +62,7 @@ i32 main(i32 argc, char *argv[]) {
     
     gbInit(&gb);
     //gbTest(&gb);
-    //gbLoadRom(&gb, "resources/rom.gb");
+    gbLoadRom(&gb, "resources/rom.gb");
     
     f32 delta_time = 0;
     u64 frame_start = SDL_GetPerformanceCounter();
