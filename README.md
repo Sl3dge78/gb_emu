@@ -27,9 +27,18 @@ Runs fairly smoothly on my machine. No optimization done at all.
 - [X] DrMario
 - [X] Metroid 2
 - [X] Link's Awakening
-- [ ] PokÃ©mon Blue
+- [ ] Pokémon Blue
 
 # Roadmap
+
+- [ ] More MBC Types
+- [ ] Audio
+    - [X] Channel 1
+    - [X] Channel 2
+    - [ ] Channel 3
+    - [ ] Channel 4
+- [ ] GBC modes
+
 ### Blargg's Tests Progress
  - [X] CPU Instructions 
  - [ ] Instruction Timing
@@ -52,11 +61,6 @@ Runs fairly smoothly on my machine. No optimization done at all.
         - [ ] tima_reload
         - [ ] time_write_reloading
         - [ ] tma_write_reloading
-
-### Features
-- [ ] More MBC Types
-- [ ] Audio
-- [ ] GBC modes
 
 # Screenshots
 ![1](https://github.com/Sl3dge78/gb_emu/blob/main/screenshots/1.png?raw=true)  
