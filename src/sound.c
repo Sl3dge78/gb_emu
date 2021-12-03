@@ -1,30 +1,3 @@
-f32 SquareWave(f32 *time, f64 note_freq, i32 sample_rate, f32 duty) {
-    f32 result = 0;
-    if(*time <= duty)
-        result = -1.0f;
-    else
-        result = 1.0f;
-    *time += note_freq * 1.0 / sample_rate;
-    if(*time > 1.0f) 
-        *time = 0.0f;
-    return result;
-}
-
-f32 SawWave(f32 *time, f64 note_freq, i32 sample_rate) {
-    f32 result = -fmod(*time, 1.0) + 0.5f;
-    *time += note_freq * 1.0 / sample_rate;
-    if(*time > 1.0f) 
-        *time = 0.0f;
-    return result;
-}
-
-f32 SineWave(f32 *time, f64 note_freq, i32 sample_rate) {
-    f32 result = sin(*time);
-    *time += note_freq * M_PI2 / sample_rate;
-    if(*time >= M_PI2)
-        *time = (-M_PI2);
-    return result;
-}
 
 f32 GetSquareDuty(u8 byte) {
     switch(byte) {
@@ -33,7 +6,6 @@ f32 GetSquareDuty(u8 byte) {
         case 2 : return 0.500f;
         case 3 : return 0.750f;
     }
-
     return 0.0f;
 }
 
@@ -54,21 +26,11 @@ void ToneChannel(i16 *stream, i32 len, f32 *time, u8 duty, u16 pitch, i8 volume,
     }
 }
 
-void NoiseChannel(i16 *stream, i32 len) {
-    
-    
-
-}
-
-u16 GetNRX0(u8 channel) {
-    switch (channel) {
-    case 1 : return 0xFF10;
-    case 2 : return 0xFF15;
-    case 3 : return 0xFF1A;
-    case 4 : return 0xFF20;
+void NoiseChannel(i16 *stream, i32 len, u16 noise_frequency, i8 volume, u32 sample_rate) {
+    for(i32 i = 0; i < len; i++) {
+        f32 test_noise_frequency = (f32)(rand() % USHRT_MAX) / (f32)USHRT_MAX;
+        stream[i] += test_noise_frequency * volume; 
     }
-    assert(0);
-    return 0;
 }
 
 void ToggleChannel(Gameboy *gb, u8 channel, bool value) {
@@ -78,61 +40,20 @@ void ToggleChannel(Gameboy *gb, u8 channel, bool value) {
     gb->mem[IO_NR52] = NR52;
 }
 
-void EnveloppeUpdate(Gameboy *gb, f32 delta_time, AudioEnveloppe *chan, u8 num) {
-    // Because calculating the proper memory address is complicated,
-    // we just did a switch to fetch the address of the 0th register of each sound channel
-    // We call this regiser NRX0. X referring to the current audio channel.
-
-    u16 NRX0 = chan->NRX0; 
-
-    u8 NRX4   = gbReadAt(gb, NRX0 + 4, 0);
-    bool counter = (NRX4 & 0x40) != 0;
-
-    // Length
-    if(counter) {
-        chan->length -= delta_time;
-        if(chan->length <= 0) {
-            chan->length = 0;
-            ToggleChannel(gb, num - 1, 0);
-            return;
-        }
-    }
-    
-    // Enveloppe sweep
-    u8 NRX2 = gbReadAt(gb, NRX0 + 2, 0);
-    u8 env_num = (NRX2 & 0x07);      
-    if (env_num) { 
-        chan->timer -= delta_time;
-        
-        if(chan->timer <= 0){
-            u8 direction = (NRX2 & 0x08) >> 3; 
-            
-            if(direction && chan->volume < 0xF) {
-                chan->volume++;
-                chan->timer = (f32)env_num * (1.0f/64.0f);
-            } else if(chan->volume > 0) {
-                chan->volume--;
-                chan->timer = (f32)env_num * (1.0f/64.0f);
-            }
-        }
-    }
-}
-
 void EnveloppeInit(Gameboy *gb, AudioEnveloppe *env, u8 channel) {
 
     u16 NRX0 = env->NRX0;
     u8 NRX4 = gbReadAt(gb, NRX0 + 4, 0);
     u8 NRX2 = gbReadAt(gb, NRX0 + 2, 0);
     u8 length = gbReadAt(gb, NRX0 + 1, 0) & 0b11111;
-    env->length = (64 - length) * (1.0f/256.0f);
+    env->length = length;
 
     u8 volume = (NRX2 & 0xF0) >> 4; 
     env->volume = volume;
     u8 env_num = (NRX2 & 0x7);
     if(env_num != 0) { // Is enveloppe sweep on
-        env->timer = (f32)env_num * (1.0f/64.0f);
+        env->timer = env_num;
     }
-
     ToggleChannel(gb, channel, volume > 0);
 }
 
@@ -146,14 +67,14 @@ void AudioCallback(void *data, u8 *_stream, i32 len) {
         stream[i] = 0;
     }
 
-    if((NR52 & 0x1) != 0){
+    if((NR52 & 0x1) != 0 && gb->channel1_enabled){
         u8 NR11   = gbReadAt(gb, IO_NR11, 0);
         u8 duty   = (NR11 & 0xC0) >> 6;
         u16 pitch = 131072 / (2048 - gb->chan1_tone);
-        ToneChannel(stream, len, &gb->chan1_time, duty, pitch, gb->channel1_enveloppe.volume, gb->sample_rate);
+        ToneChannel(stream, len, &gb->chan1_time, duty, pitch, gb->enveloppes[0].volume, gb->sample_rate);
     }
 
-    if((NR52 & 0x2) != 0) {
+    if((NR52 & 0x2) != 0 && gb->channel2_enabled) {
         u8 NR21   = gbReadAt(gb, IO_NR21, 0);
         u8 duty   = (NR21 & 0xC0) >> 6;
 
@@ -161,15 +82,10 @@ void AudioCallback(void *data, u8 *_stream, i32 len) {
         u16 pitch = gbReadAt(gb, IO_NR23, 0);
         pitch    |= (NR24 & 0x07) << 8;
         pitch = 131072 / (2048 - pitch);
-        ToneChannel(stream, len, &gb->chan2_time, duty, pitch, gb->channel2_enveloppe.volume, gb->sample_rate);
+        ToneChannel(stream, len, &gb->chan2_time, duty, pitch, gb->enveloppes[1].volume, gb->sample_rate);
     }
-    if((NR52 & 0x8) != 0) {
-        u8 NR43 = gbReadAt(gb, IO_NR43, 0);
-        u8 clock_freq   = (NR43 >> 4) & 0xF;
-        u8 counter_step = (NR43 >> 3) & 0x1;
-        u8 ratio        = (NR43 & 0x7);
-       
-        //NoiseChannel(stream, len);
+    if((NR52 & 0x8) != 0 && gb->channel4_enabled) {
+        //NoiseChannel(stream, len, gb->noise_frequency, gb->enveloppes[3].volume, gb->sample_rate);
     }
 
     for(i32 i = 0; i < len; i++) {
@@ -177,49 +93,135 @@ void AudioCallback(void *data, u8 *_stream, i32 len) {
     }
 }
 
-void gbAudioLoop(Gameboy *gb, f32 delta_time) {
-    EnveloppeUpdate(gb, delta_time, &gb->channel1_enveloppe, 1);    
-    if(gb->mem[IO_NR52] & 1) {
+void LengthUpdate(Gameboy *gb) {
+    for(i32 i = 0; i < 4; i ++) {
+        if(gb->mem[IO_NR52] & (1 << i)) {
+            AudioEnveloppe *env = &gb->enveloppes[i];
+            u16 NRX0 = env->NRX0; 
+            u8 NRX4  = gbReadAt(gb, NRX0 + 4, 0);
+            bool counter = (NRX4 & 0x40) != 0;
 
-        // Sweep
-        if(gb->sweep_timer >= 0) {
+            // Length
+            if(counter) {
+                env->length--;
+                if(env->length <= 0) {
+                    env->length = 0;
+                    ToggleChannel(gb, i, 0);
+                }
+            }
+        }
+    }
+}
 
-            gb->sweep_timer -= delta_time;
-            if(gb->sweep_timer <= 0) {                
-                gb->sweep_timer = 1.0f/128.0f;
+void SweepUpdate(Gameboy *gb) {
+    u8 NR10 = gbReadAt(gb, IO_NR10, 0);
+    u8 time     = (NR10 >> 4) & 0b111;
+    u8 decrease = (NR10 >> 3) & 1;
+    u8 nb       = (NR10) & 0b11;
+    i8 mul = decrease ? -1 : 1;
 
-                u8 NR10 = gbReadAt(gb, IO_NR10, 0);
-                u8 time     = (NR10 >> 4) & 0b111;
-                u8 decrease = (NR10 >> 3) & 1;
-                u8 nb       = (NR10) & 0b11;
-                i8 mul = decrease ? -1 : 1;
-                
-                gb->sweep_period--;
+    gb->sweep_period--;
 
-                if(gb->sweep_period == 0) {
-                    gb->sweep_period = time == 0 ? 8 : time;
+    if(gb->sweep_period == 0) {
+        gb->sweep_period = time == 0 ? 8 : time;
 
-                    // Calculate new frequency
-                    u16 new_frequency = gb->chan1_tone >> nb;
-                    if(decrease) {
-                        new_frequency = gb->chan1_tone - new_frequency;
-                    } else {
-                        new_frequency = gb->chan1_tone + new_frequency;
-                    }
-                    if(new_frequency > 0x7FF) {
-                        //ToggleChannel(gb, 0, 0);
-                    } else {
-                        gb->chan1_tone = new_frequency;
+        // Calculate new frequency
+        u16 new_frequency = gb->chan1_tone >> nb;
+        if(decrease) {
+            new_frequency = gb->chan1_tone - new_frequency;
+        } else {
+            new_frequency = gb->chan1_tone + new_frequency;
+        }
+        if(new_frequency > 0x7FF) {
+            //ToggleChannel(gb, 0, 0);
+        } else {
+            gb->chan1_tone = new_frequency;
+        }
+    }
+}
+
+void VolumeUpdate(Gameboy *gb) {
+    for(i32 i = 0; i < 4; i ++) {
+        if(gb->mem[IO_NR52] & (1 << i)) {
+            AudioEnveloppe *env = &gb->enveloppes[i];
+            u8 NRX2 = gbReadAt(gb, env->NRX0 + 2, 0);
+            u8 env_num = (NRX2 & 0x07);      
+            if (env_num) { 
+                env->timer--;
+                if(env->timer <= 0) {
+                    env->timer = env_num;
+                    u8 direction = (NRX2 & 0x08) >> 3; 
+                    if(direction && env->volume < 0xF) {
+                        env->volume++;
+                    } else if(env->volume > 0) {
+                        env->volume--;
                     }
                 }
             }
         }
     }
+}
+
+void NoiseUpdate(Gameboy *gb) {
+    if(gb->noise_timer <= 0) {
+
+
+    }
+}
+
+void gbAudio(Gameboy *gb) {
+
+    switch(gb->frame_sequencer) {
+        case 0: LengthUpdate(gb); break;
+        case 2: LengthUpdate(gb); SweepUpdate(gb); break;
+        case 4: LengthUpdate(gb); break;
+        case 6: LengthUpdate(gb); SweepUpdate(gb); break;
+        case 7: VolumeUpdate(gb); break;
+    }
+
+    gb->frame_sequencer++;
+    gb->frame_sequencer %= 8;
+    gb->apu_clock += 8192;
+
+    /*
+    EnveloppeUpdate(gb, delta_time, &gb->channel1_enveloppe, 1);    
+
+    if(gb->mem[IO_NR52] & 1) {
+
+        // Sweep
+            }
     
     if(gb->mem[IO_NR52] & 2) {
         EnveloppeUpdate(gb, delta_time, &gb->channel2_enveloppe, 2);    
     }
-    EnveloppeUpdate(gb, delta_time, &gb->channel4_enveloppe, 4);    
+    
+    // Channel 4
+    if(gb->mem[IO_NR52] & 8) {
+        //@Todo : maybe don't calcuate this each frame?
+        
+        gb->noise_timer -= delta_time;
+        if(gb->noise_timer <= 0) {
+            // Change the frequency
+            
+            u8 NR43 = gbReadAt(gb, IO_NR43, 0);
+            u8 width_mode  = ((NR43 & 0b100) >> 3) & 1;
+
+            u8 shift       = ((NR43 & 0b11110000) >> 4) & 0xF;
+            u8 divisor     = (NR43 & 0b11) & 0b11;
+            f32 real_divisor = divisor == 0 ? 0.5f : (f32)divisor;
+            u16 noise_timer_frequency = (u16)(524288 / real_divisor) << shift;
+            gb->noise_timer = 1.0f / noise_timer_frequency;
+            
+            u8 xor_result = ((gb->LFSR & 2) >> 1) ^ (gb->LFSR & 1);
+            gb->LFSR >>= 1;
+            gb->LFSR |= xor_result << 14;
+            if(width_mode)
+                gb->LSFR = (gb->LSFR & ~(1 << 6)) | (xor_result << 6);
+        }
+
+        EnveloppeUpdate(gb, delta_time, &gb->channel4_enveloppe, 4);    
+    }
+    */
 }
 
 void gbInitAudio (Gameboy *gb) {
@@ -229,7 +231,7 @@ void gbInitAudio (Gameboy *gb) {
     SDL_AudioSpec audio_spec = {0};
     audio_spec.freq = gb->sample_rate;
     audio_spec.format = AUDIO_S16SYS;
-    audio_spec.channels = 1; // @TODO Switch to stereo
+    audio_spec.channels = 1; // @todo Switch to stereo
     audio_spec.samples = 1024;
     audio_spec.callback = AudioCallback;
     audio_spec.userdata = gb;
@@ -239,14 +241,12 @@ void gbInitAudio (Gameboy *gb) {
     gbWriteAt(gb, IO_NR51, 0xF3, 0);
     gbWriteAt(gb, IO_NR52, 0x80, 0);
    
-    gb->channel1_enveloppe = (AudioEnveloppe){0};
-    gb->channel1_enveloppe.NRX0 = 0xFF10;
-
-    gb->channel2_enveloppe = (AudioEnveloppe){0};
-    gb->channel2_enveloppe.NRX0 = 0xFF15;
+    gb->enveloppes[0].NRX0 = 0xFF10;
+    gb->enveloppes[1].NRX0 = 0xFF15;
+    gb->enveloppes[3].NRX0 = 0xFF1F;
     
-    gb->channel4_enveloppe = (AudioEnveloppe){0};
-    gb->channel4_enveloppe.NRX0 = 0xFF19;
-    
-    srand(time(NULL));
+    gb->channel1_enabled = true;
+    gb->channel2_enabled = true;
+    gb->channel4_enabled = true;
+    gb->LFSR = 0xFF;
 }

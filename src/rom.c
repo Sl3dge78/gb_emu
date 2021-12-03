@@ -1,3 +1,4 @@
+// This is a 
 
 bool RomCheckForCartridgeCompatibility(u8 cartridge_type) {
     for(u32 i = 0; i < sizeof(supported_cartridges); i++) {

@@ -26,10 +26,10 @@ typedef struct AudioEnveloppe {
     u16 NRX0;
     i8 volume;
     f32 length;
-    f32 timer;
+    u8 timer;
 
 } AudioEnveloppe;
 
 void gbInitAudio (Gameboy *gb);
-void gbAudioLoop(Gameboy *gb, f32 delta_time);
+void gbAudio(Gameboy *gb);
 void EnveloppeInit(Gameboy *gb, AudioEnveloppe *env, u8 channel);

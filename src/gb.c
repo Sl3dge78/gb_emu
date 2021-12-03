@@ -1,5 +1,4 @@
 #include <stdio.h>
-
 #include "utils.h"
 #include "gb.h"
 
@@ -150,7 +149,7 @@ void gbWriteAt(Gameboy *gb, u16 address, u8 value, bool external) {
         case (IO_NR14) : {
             bool is_playing = (value & 0x80) != 0;
             if(is_playing) {
-                EnveloppeInit(gb, &gb->channel1_enveloppe, 0);
+                EnveloppeInit(gb, &gb->enveloppes[0], 0);
 
                 gb->chan1_tone = gbReadAt(gb, IO_NR13, 0);
                 gb->chan1_tone |= (value & 0x07) << 8;
@@ -164,14 +163,14 @@ void gbWriteAt(Gameboy *gb, u16 address, u8 value, bool external) {
         case (IO_NR24) : {
             bool is_playing = (value & 0x80) != 0;
             if(is_playing) {
-                EnveloppeInit(gb, &gb->channel2_enveloppe, 1);
+                EnveloppeInit(gb, &gb->enveloppes[1], 1);
             }
         } break;
         // Channel 4
         case (IO_NR44) : {
             bool is_playing = (value & 0x80) != 0;
             if(is_playing) {
-                EnveloppeInit(gb, &gb->channel4_enveloppe, 3);
+                EnveloppeInit(gb, &gb->enveloppes[3], 3);
             }
         } break;
 
@@ -592,12 +591,13 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
         gb->cycles_left += delta_time * gb->clock_speed * gb->clock_mul;
         if(gb->cycles_left > 69905) gb->cycles_left = 69905; // 69905 = Clockspeed * 1 / 60
         
-        gbAudioLoop(gb, delta_time);
+        // gbAudioLoop(gb, delta_time);
     }
     
     const u8 *keyboard = SDL_GetKeyboardState(0);
     
     while(gb->cycles_left >= 0) {
+        // Cpu
         if(gb->cpu_clock <= 0) {
             if(!gb->halted) 
                 gbExecute(gb);           
@@ -613,9 +613,16 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
             }
 
         } 
+
+        // Video
         while(gb->ppu_clock <= 0)
             gbLCD(gb);
-        
+       
+        // Audio
+        while(gb->apu_clock <= 0) {
+            gbAudio(gb);
+        }
+
         // DMA
         if(gb->DMA_cycles_left >= 0) {
             u16 addr_read = gbReadAt(gb, 0xFF46, 0) << 8;
@@ -626,7 +633,7 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
             gb->DMA_cycles_left--;
         }
 
-        u8 TAC = gbReadAt(gb, IO_TAC,0 );
+        u8 TAC = gbReadAt(gb, IO_TAC, 0);
         if(TAC >> 2 & 1) { // Timer enabled
             gb->timer++;
             u16 TIMA = gbReadAt(gb, IO_TIMA, 0);
@@ -677,8 +684,9 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
             JOY = 0b11100000;
             JOY |= gb->keys_dpad & 0x0F;
         }
-        gbWriteAt(gb, IO_JOY, JOY, 0);
-        
+        gbWriteAt(gb, IO_JOY, JOY, 0); 
+
+        gb->apu_clock--;
         gb->cpu_clock--;
         gb->ppu_clock--;
         gb->cycles_left--;

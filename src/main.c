@@ -64,7 +64,7 @@ i32 main(i32 argc, char *argv[]) {
     gbInit(&gb);
     //gbTest(&gb);
     //gbLoadRom(&gb, "resources/rom.gb");
-    gbLoadRom(&gb, "resources/zelda_rom.gb");
+    gbLoadRom(&gb, "resources/tetris_rom.gb");
     
     f32 delta_time = 0;
     u64 frame_start = SDL_GetPerformanceCounter();
@@ -134,7 +134,7 @@ i32 main(i32 argc, char *argv[]) {
     }
     
     free(gb.mem);
-    
+ 
     SDL_DestroyWindow(window);
     TTF_CloseFont(global_font);
     TTF_Quit();

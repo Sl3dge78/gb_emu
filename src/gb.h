@@ -104,6 +104,7 @@ typedef union Palette {
     u32 single; 
 
 } Palette;
+
 Palette GetPaletteFromByte(const u8 byte) {
     Palette result = {0};
     result.array[0] = byte & 0b11;
@@ -177,16 +178,22 @@ typedef struct Gameboy {
     SDL_AudioDeviceID audio_device;
     u32 audio_gain;
 
-    AudioEnveloppe channel1_enveloppe;
+    i32 apu_clock;
+    i32 frame_sequencer;
+    AudioEnveloppe enveloppes[4];
+    bool channel1_enabled;
     f32 chan1_time;
     u16 chan1_tone;
     f32 sweep_timer;
     u8 sweep_period;
 
-    AudioEnveloppe channel2_enveloppe;
+    bool channel2_enabled;
     f32 chan2_time;
 
-    AudioEnveloppe channel4_enveloppe;
+    bool channel4_enabled;
+    u16 LFSR;
+    u16 noise_timer;
+
     // Internals
     bool rom_loaded;
     i32 cpu_clock;
