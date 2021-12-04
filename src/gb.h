@@ -2,6 +2,8 @@
 
 #include "utils.h"
 
+#define CLOCK_SPEED   4194304
+
 #define SCREEN_WIDTH  160
 #define SCREEN_HEIGHT 144
 

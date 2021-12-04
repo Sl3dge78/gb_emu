@@ -171,6 +171,21 @@ void gbWriteAt(Gameboy *gb, u16 address, u8 value, bool external) {
                 gb->apu.channel2.duty = (NR21 & 0xC0) >> 6;
             }
         } break;
+        case (IO_NR30): {
+            gb->apu.is_playing[2] = (value >> 7) & 1;
+        } break;
+        case (IO_NR32): {
+            gb->apu.enveloppes[2].volume = (value >> 5) & 3;
+        } break;
+        case (IO_NR34): {
+            bool is_playing = (value & 0x80) != 0;
+            if(is_playing) {
+                EnveloppeInit(gb, &gb->apu.enveloppes[2], 2);
+                u8 NR31 = gbReadAt(gb, IO_NR31, 0);
+                gb->apu.channel3.pitch = gbReadAt(gb, IO_NR33, 0);
+                gb->apu.channel3.pitch |= (value & 0x07) << 8;
+            }
+        } break;
         // Channel 4
         case (IO_NR44) : {
             bool is_playing = (value & 0x80) != 0;
@@ -178,9 +193,14 @@ void gbWriteAt(Gameboy *gb, u16 address, u8 value, bool external) {
                 EnveloppeInit(gb, &gb->apu.enveloppes[3], 3);
             }
         } break;
-
     }
     
+    if(address >= IO_WAV && address <= IO_WAV_END) {
+        u32 wave_id = (address - IO_WAV) * 2;
+        gb->apu.wave[wave_id] = (value & 0xF0) >> 4;
+        gb->apu.wave[wave_id + 1] = value & 0x0F;
+    }
+
     if(address >= MEM_MIRROR0_START && address <= MEM_MIRROR1_END) {
         address -= MEM_MIRROR0_START;
     }
@@ -624,10 +644,7 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
             gbLCD(gb);
        
         // Audio
-        while(gb->apu.apu_clock <= 0) {
             gbAudio(gb);
-        }
-        NoiseUpdate(gb, &gb->apu.channel4);
 
         // DMA
         if(gb->DMA_cycles_left >= 0) {
@@ -692,7 +709,6 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
         }
         gbWriteAt(gb, IO_JOY, JOY, 0); 
 
-        gb->apu.apu_clock--;
         gb->cpu_clock--;
         gb->ppu_clock--;
         gb->cycles_left--;
