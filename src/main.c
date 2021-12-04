@@ -63,7 +63,7 @@ i32 main(i32 argc, char *argv[]) {
     
     gbInit(gb);
     //gbLoadRom(&gb, "resources/rom.gb");
-    //gbLoadRom(gb, "resources/pkmn_rom.gb");
+    //gbLoadRom(gb, "resources/dr_mario_rom.gb");
     
     f32 delta_time = 0;
     u64 frame_start = SDL_GetPerformanceCounter();

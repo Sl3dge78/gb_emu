@@ -56,7 +56,7 @@ void EnveloppeInit(Gameboy *gb, AudioEnveloppe *env, u8 channel) {
 
     if(channel != 2) {
         u8 length = gbReadAt(gb, NRX0 + 1, 0) & 0b11111;
-        env->length = length;
+        env->length = 64 - length;
         u8 volume = (NRX2 & 0xF0) >> 4; 
         env->volume = volume;
         u8 env_num = (NRX2 & 0x7);
@@ -64,7 +64,7 @@ void EnveloppeInit(Gameboy *gb, AudioEnveloppe *env, u8 channel) {
             env->timer = env_num;
         }
     } else {
-        env->length = gbReadAt(gb, NRX0 + 1, 0);
+        env->length = 256 - gbReadAt(gb, NRX0 + 1, 0);
         env->volume = (NRX2 >> 5) & 3; 
     }
     ToggleChannel(&gb->apu, channel, env->volume > 0); 
