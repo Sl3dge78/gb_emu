@@ -245,6 +245,8 @@ void gbInterrupt(Gameboy *gb, u8 id) {
 
 
 void gbLoadRom(Gameboy *gb, const char *path) {
+    if(gb->rom_loaded) 
+       RomDestroy(&gb->rom);
     RomLoad(&gb->rom, path);
     gb->rom_loaded = true;
 }
@@ -737,6 +739,12 @@ void gbDraw(Gameboy *gb, u32 zoom, SDL_Renderer *renderer) {
             SDL_RenderDrawPoint(renderer, x, y);
         }
     }
+}
+
+void gbDestroy(Gameboy *gb) {
+    free(gb->mem);
+    RomDestroy(&gb->rom);
+    free(gb);
 }
 
 // --------

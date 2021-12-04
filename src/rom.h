@@ -16,7 +16,7 @@ const u8 supported_cartridges[] = {
 
 
 typedef struct Rom {
-    const char *path;
+    char *path;
     u8 type;
 
     u8 *rom_data;
@@ -37,3 +37,4 @@ void RomReset(Rom *rom);
 void RomUnload(Rom *rom);
 u8   RomRead(Rom *rom, u16 address);
 void RomWrite(Rom *rom,u16 address, u8 value);
+void RomDestroy(Rom *rom);

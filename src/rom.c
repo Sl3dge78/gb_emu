@@ -1,5 +1,3 @@
-// This is a 
-
 bool RomCheckForCartridgeCompatibility(u8 cartridge_type) {
     for(u32 i = 0; i < sizeof(supported_cartridges); i++) {
         if(supported_cartridges[i] == cartridge_type)
@@ -19,7 +17,7 @@ void RomGetSavePath(Rom *rom, char *save_path, u32 str_size) {
 void RomSaveRam(Rom *rom) {
     char save_path[256];
     RomGetSavePath(rom, save_path, 256);
-    FILE *ram_file = fopen(save_path, "wb");
+    FILE *ram_file = fopen(save_path, "wb+");
     if(ram_file) {
         fwrite(rom->ram_data, sizeof(u8), rom->ram_size, ram_file);
         fclose(ram_file);
@@ -45,13 +43,17 @@ void RomLoadRam(Rom *rom) {
 }
 
 void RomLoad(Rom *rom, const char *path) {
-    rom->path = path;
     FILE *rom_file = fopen(path, "rb");
     
     fseek(rom_file, 0, SEEK_END);
     rom->rom_size = ftell(rom_file);
     rewind(rom_file);
-    
+    if(rom->path) {
+        free(rom->path);
+        rom->path = NULL;
+    }
+    rom->path = calloc(strlen(path) + 1, sizeof(char));
+    strcpy(rom->path, path);
     rom->rom_data = calloc(rom->rom_size, sizeof(u8));
     
     fread(rom->rom_data, 1, rom->rom_size, rom_file);
@@ -80,6 +82,13 @@ void RomLoad(Rom *rom, const char *path) {
     // Load save if any
     RomLoadRam(rom);
     RomReset(rom);
+}
+
+void RomDestroy(Rom *rom) {
+    free(rom->path);
+    free(rom->rom_data);
+    if(rom->ram_size)
+        free(rom->ram_data);
 }
 
 void RomReset(Rom *rom) {
@@ -115,8 +124,8 @@ void RomWrite(Rom *rom, u16 address, u8 value) {
         case (0x3): { // MBC 1
             if(address >= 0x0000 && address <= 0x1FFF) { // RAM Enable
                 if(value == 0) { // We're diabling Ram so save it to file
-                    RomSaveRam(rom);
                     SDL_Log("Saving ram");
+                    RomSaveRam(rom);
                 }
                 return;
             } else if (address >= 0x2000 && address <= 0x2FFF) { // ROM bank

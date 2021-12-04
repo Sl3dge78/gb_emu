@@ -143,8 +143,7 @@ i32 main(i32 argc, char *argv[]) {
         SDL_RenderPresent(renderer);
     }
     
-    free(gb->mem);
-    free(gb);
+    gbDestroy(gb);
  
     SDL_DestroyWindow(window);
     TTF_CloseFont(global_font);
