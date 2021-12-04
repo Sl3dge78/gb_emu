@@ -27,11 +27,11 @@ Runs fairly smoothly on my machine. No optimization done at all.
 - [X] DrMario
 - [X] Metroid 2
 - [X] Link's Awakening
-- [ ] Pokémon Blue
+- [ ] PokÃ©mon Blue
 
 # Roadmap
 
-- [ ] Audio
+- [X] Audio
     - [X] Channel 1
     - [X] Channel 2
     - [X] Channel 3
