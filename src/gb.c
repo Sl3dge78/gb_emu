@@ -145,7 +145,12 @@ void gbWriteAt(Gameboy *gb, u16 address, u8 value, bool external) {
                 value &= 0x80;
             }
         } break;
-
+        case (IO_NR11): {
+            gb->apu.enveloppes[0].length = (value) & 0b11111;
+        } break;
+        case (IO_NR12): {
+            gb->apu.enveloppes[0].volume = (value >> 4) & 0xF;
+        } break;
         case (IO_NR14) : {
             bool is_playing = (value & 0x80) != 0;
             if(is_playing) {
@@ -161,6 +166,12 @@ void gbWriteAt(Gameboy *gb, u16 address, u8 value, bool external) {
             }
         } break;
     
+        case (IO_NR21): {
+            gb->apu.enveloppes[1].length = (value) & 0b11111;
+        } break;
+        case (IO_NR22): {
+            gb->apu.enveloppes[1].volume = (value >> 4) & 0xF;
+        } break;
         case (IO_NR24) : {
             bool is_playing = (value & 0x80) != 0;
             if(is_playing) {
@@ -171,8 +182,8 @@ void gbWriteAt(Gameboy *gb, u16 address, u8 value, bool external) {
                 gb->apu.channel2.duty = (NR21 & 0xC0) >> 6;
             }
         } break;
-        case (IO_NR30): {
-            gb->apu.is_playing[2] = (value >> 7) & 1;
+        case (IO_NR31): {
+            gb->apu.enveloppes[2].length = (value) & 0b11111;
         } break;
         case (IO_NR32): {
             gb->apu.enveloppes[2].volume = (value >> 5) & 3;
