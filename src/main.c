@@ -62,7 +62,6 @@ i32 main(i32 argc, char *argv[]) {
     Gameboy gb = {0};
     
     gbInit(&gb);
-    //gbTest(&gb);
     //gbLoadRom(&gb, "resources/rom.gb");
     gbLoadRom(&gb, "resources/tetris_rom.gb");
     

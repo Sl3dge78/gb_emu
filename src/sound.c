@@ -10,7 +10,6 @@ f32 GetSquareDuty(u8 byte) {
 }
 
 void ToneChannel(i16 *stream, i32 len, f32 *time, u8 duty, u16 pitch, i8 volume, u32 sample_rate) {
-   
     for(i32 i = 0; i < len; i++) {
         f32 result = 0;
         if(*time <= GetSquareDuty(duty))
@@ -27,7 +26,8 @@ void ToneChannel(i16 *stream, i32 len, f32 *time, u8 duty, u16 pitch, i8 volume,
 
 void NoiseChannel(i16 *stream, i32 len, i16 value, i8 volume, u32 sample_rate) {
     for(i32 i = 0; i < len; i++) {
-        stream[i] += value * volume; 
+        f32 random = (f32)(rand() % 3) / 2.0f;
+        stream[i] += random * value * volume;
     }
 }
 
@@ -67,12 +67,12 @@ void AudioCallback(void *data, u8 *_stream, i32 len) {
 
     if(apu->channel1.is_playing){
         u16 pitch = 131072 / (2048 - apu->channel1.pitch);
-        ToneChannel(stream, len, &apu->channel1.time, apu->channel1.duty, pitch, apu->enveloppes[0].volume, apu->sample_rate);
+        //ToneChannel(stream, len, &apu->channel1.time, apu->channel1.duty, pitch, apu->enveloppes[0].volume, apu->sample_rate);
     }
 
     if(apu->channel2.is_playing) {
         u16 pitch = 131072 / (2048 - apu->channel2.pitch);
-        ToneChannel(stream, len, &apu->channel2.time, apu->channel2.duty, pitch, apu->enveloppes[1].volume, apu->sample_rate);
+        //ToneChannel(stream, len, &apu->channel2.time, apu->channel2.duty, pitch, apu->enveloppes[1].volume, apu->sample_rate);
     }
 
     if(apu->channel4.is_playing) {
@@ -193,7 +193,7 @@ void gbAudio(Gameboy *gb) {
 }
 
 void gbInitAudio (Gameboy *gb, APU *apu) {
-    apu->sample_rate = 48000;
+    apu->sample_rate = 44000;
     apu->audio_gain = 2000;
 
     SDL_AudioSpec audio_spec = {0};
@@ -214,4 +214,5 @@ void gbInitAudio (Gameboy *gb, APU *apu) {
     apu->enveloppes[3].NRX0 = 0xFF1F;
     
     apu->channel4.LFSR = 0xFFFF;
+    srand(time(NULL));
 }
