@@ -27,9 +27,45 @@ typedef struct AudioEnveloppe {
     i8 volume;
     f32 length;
     u8 timer;
-
 } AudioEnveloppe;
 
-void gbInitAudio (Gameboy *gb);
+typedef struct Channel1 {
+    bool is_playing;
+    u8 duty; 
+    f32 time;
+    u16 pitch;
+    f32 sweep_timer;
+    u8 sweep_period;
+} Channel1;
+
+typedef struct Channel2 {
+    bool is_playing;
+    u8 duty; 
+    f32 time;
+    u16 pitch; 
+} Channel2;
+
+typedef struct Channel4 {
+    bool is_playing;
+    u16 LFSR;
+    u16 timer;
+} Channel4;
+
+typedef struct APU {
+    u32 sample_rate;
+    SDL_AudioDeviceID audio_device;
+    u32 audio_gain;
+
+    i32 apu_clock;
+    i32 frame_sequencer;
+    AudioEnveloppe enveloppes[4];
+
+    Channel1 channel1;
+    Channel2 channel2;
+    Channel4 channel4;
+} APU;
+
+void gbInitAudio (Gameboy *gb, APU *apu);
 void gbAudio(Gameboy *gb);
 void EnveloppeInit(Gameboy *gb, AudioEnveloppe *env, u8 channel);
+void NoiseUpdate(Gameboy *gb, Channel4 *chan4);

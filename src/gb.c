@@ -140,7 +140,7 @@ void gbWriteAt(Gameboy *gb, u16 address, u8 value, bool external) {
         case (IO_DIV)  : if(external) gb->timer = 0; break;
         case (IO_NR52) : {
             bool toggle = !((value >> 7) & 1);
-            SDL_PauseAudioDevice(gb->audio_device, toggle);
+            SDL_PauseAudioDevice(gb->apu.audio_device, toggle);
             if(external) {
                 value &= 0x80;
             }
@@ -149,28 +149,33 @@ void gbWriteAt(Gameboy *gb, u16 address, u8 value, bool external) {
         case (IO_NR14) : {
             bool is_playing = (value & 0x80) != 0;
             if(is_playing) {
-                EnveloppeInit(gb, &gb->enveloppes[0], 0);
-
-                gb->chan1_tone = gbReadAt(gb, IO_NR13, 0);
-                gb->chan1_tone |= (value & 0x07) << 8;
-                gb->sweep_timer = (1.0f/128.0f);
+                EnveloppeInit(gb, &gb->apu.enveloppes[0], 0);
                 u8 NR10 = gbReadAt(gb, IO_NR10, 0);
+                u8 NR11 = gbReadAt(gb, IO_NR11, 0);
+                gb->apu.channel1.pitch = gbReadAt(gb, IO_NR13, 0);
+                gb->apu.channel1.pitch |= (value & 0x07) << 8;
+                gb->apu.channel1.sweep_timer = (1.0f/128.0f);
                 u8 time = (NR10 >> 4) & 0b111;
-                gb->sweep_period = time == 0 ? 8 : time;
+                gb->apu.channel1.sweep_period = time == 0 ? 8 : time;
+                gb->apu.channel1.duty = (NR11 & 0xC0) >> 6;
             }
         } break;
     
         case (IO_NR24) : {
             bool is_playing = (value & 0x80) != 0;
             if(is_playing) {
-                EnveloppeInit(gb, &gb->enveloppes[1], 1);
+                EnveloppeInit(gb, &gb->apu.enveloppes[1], 1);
+                u8 NR21 = gbReadAt(gb, IO_NR21, 0);
+                gb->apu.channel2.pitch = gbReadAt(gb, IO_NR23, 0);
+                gb->apu.channel2.pitch |= (value & 0x07) << 8;
+                gb->apu.channel2.duty = (NR21 & 0xC0) >> 6;
             }
         } break;
         // Channel 4
         case (IO_NR44) : {
             bool is_playing = (value & 0x80) != 0;
             if(is_playing) {
-                EnveloppeInit(gb, &gb->enveloppes[3], 3);
+                EnveloppeInit(gb, &gb->apu.enveloppes[3], 3);
             }
         } break;
 
@@ -273,7 +278,7 @@ void gbInit(Gameboy *gb) {
         fclose(file);
     } 
    
-    gbInitAudio(gb);
+    gbInitAudio(gb, &gb->apu);
     gb->rom = (Rom){0};
     gbReset(gb);
 }
@@ -619,9 +624,10 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
             gbLCD(gb);
        
         // Audio
-        while(gb->apu_clock <= 0) {
+        while(gb->apu.apu_clock <= 0) {
             gbAudio(gb);
         }
+        NoiseUpdate(gb, &gb->apu.channel4);
 
         // DMA
         if(gb->DMA_cycles_left >= 0) {
@@ -686,7 +692,7 @@ void gbLoop(Gameboy *gb, f32 delta_time) {
         }
         gbWriteAt(gb, IO_JOY, JOY, 0); 
 
-        gb->apu_clock--;
+        gb->apu.apu_clock--;
         gb->cpu_clock--;
         gb->ppu_clock--;
         gb->cycles_left--;
