@@ -507,20 +507,25 @@ void gbOAM(Gameboy *gb, u8 LCDC, u8 LY) {
         if(sprite.y <= LY && sprite.y + 8 > LY) {
             // Draw tile
             u8 line = LY - sprite.y;
+            u8 tile = sprite.tile;
             if (is_y_flipped) {
-                line = 8 - line;
+                if (sprite_size == 1)
+                    tile++;
+                line = 7 - line;
             }
-            TileLine tl = gbGetTileLine(gb, sprite.tile, 1, line);
-            u32 sx = sprite.x - 8;
+            TileLine tl = gbGetTileLine(gb, tile, 1, line);
+            u32 sx = sprite.x - 7;
             gbRenderSpriteLine(gb, pal, tl, &sx, LY, is_x_flipped, priority);
             sprite_count++;
         } else if(sprite_size == 1 && sprite.y + 8 <= LY && sprite.y + 16 > LY) {
             u8 line = LY - sprite.y - 8;
+            u8 tile = sprite.tile + 1;
             if (is_y_flipped) {
-                line = 8 - line;
+                line = 7 - line;
+                tile--;
             }
-            TileLine tl = gbGetTileLine(gb, sprite.tile+1, 1, line);
-            u32 sx = sprite.x - 8;
+            TileLine tl = gbGetTileLine(gb, tile, 1, line);
+            u32 sx = sprite.x - 7;
             gbRenderSpriteLine(gb, pal, tl, &sx, LY, is_x_flipped, priority);
             sprite_count++;
 

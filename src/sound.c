@@ -214,7 +214,7 @@ void gbAudio(Gameboy *gb) {
     if(apu->sample_clock <= 0) { 
         i8 sample = GetSample(apu);
         SDL_QueueAudio(apu->audio_device, &sample, 1);
-        apu->sample_clock = (f32)CLOCK_SPEED / (f32)apu->sample_rate;
+        apu->sample_clock += (f32)CLOCK_SPEED / (f32)apu->sample_rate;
     }
     
     apu->sample_clock--;

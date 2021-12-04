@@ -63,7 +63,7 @@ i32 main(i32 argc, char *argv[]) {
     
     gbInit(gb);
     //gbLoadRom(&gb, "resources/rom.gb");
-    gbLoadRom(gb, "resources/tetris_rom.gb");
+    //gbLoadRom(gb, "resources/pkmn_rom.gb");
     
     f32 delta_time = 0;
     u64 frame_start = SDL_GetPerformanceCounter();
@@ -128,6 +128,17 @@ i32 main(i32 argc, char *argv[]) {
                 gbDrawDebug(gb, (SDL_Rect){0, 0, SCREEN_WIDTH * zoom, SCREEN_HEIGHT * zoom}, &console, renderer);
                 DrawConsole(renderer, &console, SCREEN_WIDTH * zoom, h);
             }
+        } else {
+            SDL_SetRenderDrawColor(renderer, 25, 25, 25, 255);
+            SDL_RenderClear(renderer);
+            SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
+            u32 y = 10;
+            RenderLine(renderer, 10, &y, "F1 : Load a rom");
+            RenderLine(renderer, 10, &y, "S  : A");
+            RenderLine(renderer, 10, &y, "A  : B");
+            RenderLine(renderer, 10, &y, "W  : Select");
+            RenderLine(renderer, 10, &y, "X  : Start");
+            RenderLine(renderer, 10, &y, "F5 : Display debug");
         }
         SDL_RenderPresent(renderer);
     }
