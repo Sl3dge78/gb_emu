@@ -34,7 +34,7 @@ Runs fairly smoothly on my machine. No optimization done at all.
 - [ ] Audio
     - [X] Channel 1
     - [X] Channel 2
-    - [ ] Channel 3
+    - [X] Channel 3
     - [X] Channel 4
 - [ ] More MBC Types
 - [ ] GBC modes

@@ -22,12 +22,6 @@ i8 ToneChannel(f32 *time, u8 duty, u16 pitch, i8 volume, u32 sample_rate) {
     return result;
 }
 
-i8 NoiseChannel(i16 value, i8 volume, u32 sample_rate) {
-    u32 random = rand();
-    f32 frand = (f32)(random % 3) / 3.f;
-    return (frand * value * volume);
-}
-
 u8 WaveChannel(u8 wave[32], Channel3 *channel3, const AudioEnveloppe *env, u32 sample_rate) {
     i8 result = (wave[(u32)channel3->time]) * 2;
     result -= 0xF;
@@ -97,8 +91,8 @@ i8 GetSample(APU *apu) {
     }
 
     if(apu->is_playing[3]) {
-        i16 value = apu->channel4.LFSR & 1 ? -1 : 1;
-        chan4 = NoiseChannel(value, apu->enveloppes[3].volume, apu->sample_rate);
+        chan4 = apu->channel4.LFSR & 1 ? -1 : 1; 
+        chan4 *= apu->enveloppes[3].volume;
     }
     
     i8 mix = (chan1 + chan2 + chan3 + chan4) / 4;
@@ -180,13 +174,13 @@ void NoiseUpdate(Gameboy *gb, Channel4 *chan4) {
     chan4->timer--;
     if(chan4->timer <= 0) {
         // Calculate noise timer
-        static const u8 divisors_table[8] = {8, 16, 32, 48, 64, 80, 96, 112};
+        static const u8 divisors_table[8] = {4, 8, 16, 24, 32, 40, 48, 56};
         u8 NR43 = gbReadAt(gb, IO_NR43, 0);
         u8 shift       = ((NR43 & 0b11110000) >> 4) & 0xF;
-        u8 divisor     = (NR43 & 0b11) & 0b11;
+        u8 ratio       = (NR43 & 0b11) & 0b11;
         u8 width_mode  = ((NR43 & 0b100) >> 3) & 1;
-        divisor = divisors_table[divisor];
-        chan4->timer = divisor << shift;
+        u16 timer = divisors_table[ratio]; 
+        chan4->timer = timer << shift;
         
         u8 xor_result = ((chan4->LFSR & 2) >> 1) ^ (chan4->LFSR & 1);
         chan4->LFSR >>= 1;
@@ -220,7 +214,7 @@ void gbAudio(Gameboy *gb) {
     if(apu->sample_clock <= 0) { 
         i8 sample = GetSample(apu);
         SDL_QueueAudio(apu->audio_device, &sample, 1);
-        apu->sample_clock = CLOCK_SPEED / apu->sample_rate;
+        apu->sample_clock = (f32)CLOCK_SPEED / (f32)apu->sample_rate;
     }
     
     apu->sample_clock--;

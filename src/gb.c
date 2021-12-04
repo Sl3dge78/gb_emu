@@ -187,6 +187,9 @@ void gbWriteAt(Gameboy *gb, u16 address, u8 value, bool external) {
             }
         } break;
         // Channel 4
+        case (IO_NR42): {
+            gb->apu.enveloppes[3].volume = (value >> 4) & 0xF;
+        } break;
         case (IO_NR44) : {
             bool is_playing = (value & 0x80) != 0;
             if(is_playing) {

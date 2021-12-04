@@ -67,7 +67,7 @@ typedef struct APU {
     SDL_AudioDeviceID audio_device;
     u32 audio_gain;
 
-    i32 sample_clock;
+    f32 sample_clock;
 
     i32 frame_clock;
     i32 frame_sequencer;
