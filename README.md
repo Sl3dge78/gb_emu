@@ -1,6 +1,8 @@
 Just another GameBoy emulator made for fun and learning. Features a full memory map view of the key places, breakpoints, and dissassembly.
 Runs fairly smoothly on my machine. No optimization done at all. 
 
+For a more complete amulation including more MBC types please go to my port in Jai: https://github.com/Sl3dge78/JaiBoy
+
 # Use 
 - Press F1 to open a rom
 
